@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Evidence Document (MongoDB)",
+  "description": "Schema for evidence documents stored in MongoDB",
+  "type": "object",
+  "required": ["evidence_id", "fir_id", "uploaded_by", "file_hash", "file_type", "status"],
+  "properties": {
+    "evidence_id": {
+      "type": "string",
+      "description": "Unique evidence identifier"
+    },
+    "fir_id": {
+      "type": "string",
+      "description": "Associated FIR ID"
+    },
+    "uploaded_by": {
+      "type": "string",
+      "description": "User ID of uploader"
+    },
+    "file_hash": {
+      "type": "string",
+      "description": "SHA-256 hash of the evidence file"
+    },
+    "file_type": {
+      "type": "string",
+      "enum": ["video", "audio", "image", "document"]
+    },
+    "file_format": {
+      "type": "string",
+      "description": "File format (e.g., mp4, jpg, pdf)"
+    },
+    "file_size_bytes": {
+      "type": "integer",
+      "description": "File size in bytes"
+    },
+    "storage_path": {
+      "type": "string",
+      "description": "S3 path to the evidence file"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["temporary", "under_review", "verified_permanent", "rejected"],
+      "description": "Evidence review status"
+    },
+    "review_deadline": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Deadline for evidence review (3-5 days from upload)"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "capture_date": { "type": "string", "format": "date-time" },
+        "capture_location": {
+          "type": "object",
+          "properties": {
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" }
+          }
+        },
+        "device_info": { "type": "string" },
+        "duration_seconds": { "type": "number" },
+        "resolution": { "type": "string" }
+      }
+    },
+    "ai_analysis": {
+      "type": "object",
+      "properties": {
+        "authenticity_score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "deepfake_probability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "content_tags": { "type": "array", "items": { "type": "string" } },
+        "violence_detected": { "type": "boolean" },
+        "threat_level": { "type": "string", "enum": ["none", "low", "medium", "high"] }
+      }
+    },
+    "chain_of_custody": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string" },
+          "actor_id": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "details": { "type": "string" }
+        }
+      }
+    },
+    "blockchain_tx_id": {
+      "type": "string",
+      "description": "Blockchain transaction ID for hash record"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

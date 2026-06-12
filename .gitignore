@@ -1,0 +1,101 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+venv/
+env/
+.venv/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.staging
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+*.log
+
+# Docker
+docker-compose.override.yml
+
+# Kubernetes secrets
+kubernetes/secrets/
+
+# Database
+*.sqlite3
+*.db
+database/backups/*.sql
+database/backups/*.gz
+
+# AI/ML
+ai-engine/**/*.h5
+ai-engine/**/*.pt
+ai-engine/**/*.pth
+ai-engine/**/*.onnx
+ai-engine/**/*.pkl
+ai-engine/**/*.joblib
+research/datasets/*.csv
+research/datasets/*.json
+research/datasets/*.parquet
+research/model-training/checkpoints/
+
+# Blockchain
+blockchain/smart-contracts/build/
+blockchain/smart-contracts/artifacts/
+
+# Coverage
+coverage/
+.coverage
+htmlcov/
+.nyc_output/
+
+# Build outputs
+*.min.js
+*.min.css
+*.map
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Uploads and media (local dev)
+uploads/
+media/
+tmp/
+
+# Terraform
+infrastructure/terraform/.terraform/
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.backup
+infrastructure/terraform/.terraform.lock.hcl
+
+# Security
+security/key-management/*.pem
+security/key-management/*.key
+security/key-management/*.crt
+*.p12
+*.jks
