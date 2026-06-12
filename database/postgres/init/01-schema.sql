@@ -175,6 +175,60 @@ CREATE TABLE audit_logs (
 -- Audit logs are append-only (no UPDATE/DELETE permissions)
 
 -- ============================================================================
+-- Court Integration
+-- ============================================================================
+
+CREATE TABLE court_orders (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    fir_id UUID REFERENCES firs(id),
+    order_type VARCHAR(50) CHECK (order_type IN (
+        'fir_amendment', 'investigation_directive', 'bail',
+        'arrest_warrant', 'evidence_request', 'case_closure'
+    )),
+    order_text TEXT NOT NULL,
+    issued_by UUID REFERENCES users(id),
+    digital_signature TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================================
+-- Sessions & OTP
+-- ============================================================================
+
+CREATE TABLE user_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id),
+    refresh_token TEXT NOT NULL,
+    ip_address INET,
+    user_agent TEXT,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE otp_records (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id),
+    otp_hash VARCHAR(255) NOT NULL,
+    purpose VARCHAR(50) DEFAULT 'login',
+    attempts INT DEFAULT 0,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================================
+-- Default Roles
+-- ============================================================================
+
+INSERT INTO roles (name, description, permissions) VALUES
+    ('citizen', 'Regular citizen', '["file_complaint", "upload_evidence", "view_own_cases"]'),
+    ('officer', 'Police officer', '["view_firs", "update_fir_status", "manage_investigations"]'),
+    ('inspector', 'Police inspector', '["view_firs", "assign_officers", "manage_investigations", "review_evidence"]'),
+    ('moderator', 'Content moderator', '["review_social_media", "flag_content", "review_evidence"]'),
+    ('judge', 'Judiciary member', '["view_cases", "issue_orders", "authorize_amendments"]'),
+    ('admin', 'System administrator', '["manage_users", "manage_roles", "view_audit", "system_config"]');
+
+-- ============================================================================
 -- Indexes
 -- ============================================================================
 

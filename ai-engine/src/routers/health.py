@@ -1,0 +1,14 @@
+from fastapi import APIRouter
+from datetime import datetime
+
+router = APIRouter()
+
+
+@router.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "ai-engine",
+        "timestamp": datetime.utcnow().isoformat(),
+        "models_loaded": True,
+    }

@@ -1,0 +1,30 @@
+export const config = {
+  port: parseInt(process.env.APP_PORT || '8080', 10),
+  nodeEnv: process.env.NODE_ENV || 'development',
+  jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
+  redis: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    password: process.env.REDIS_PASSWORD,
+  },
+  services: {
+    auth: process.env.AUTH_SERVICE_URL || 'http://localhost:8001',
+    citizen: process.env.CITIZEN_SERVICE_URL || 'http://localhost:8002',
+    fir: process.env.FIR_SERVICE_URL || 'http://localhost:8003',
+    evidence: process.env.EVIDENCE_SERVICE_URL || 'http://localhost:8004',
+    socialMedia: process.env.SOCIAL_MEDIA_SERVICE_URL || 'http://localhost:8005',
+    accountability: process.env.ACCOUNTABILITY_SERVICE_URL || 'http://localhost:8006',
+    notification: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8007',
+    investigation: process.env.INVESTIGATION_SERVICE_URL || 'http://localhost:8008',
+    court: process.env.COURT_SERVICE_URL || 'http://localhost:8009',
+    analytics: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:8010',
+    audit: process.env.AUDIT_SERVICE_URL || 'http://localhost:8011',
+    ai: process.env.AI_ENGINE_URL || 'http://localhost:8000',
+  },
+  rateLimit: {
+    citizen: { windowMs: 60_000, max: 60 },
+    officer: { windowMs: 60_000, max: 120 },
+    admin: { windowMs: 60_000, max: 300 },
+    default: { windowMs: 60_000, max: 60 },
+  },
+};
