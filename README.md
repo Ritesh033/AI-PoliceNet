@@ -138,6 +138,7 @@ AI-PoliceNet/
 │   ├── officer-app/
 │   └── emergency-app/
 ├── backend/
+│   ├── case-core/            # Case workflow + tamper-evident ledger (FastAPI, demo auth)
 │   ├── api-gateway/
 │   ├── authentication-service/
 │   ├── citizen-service/
