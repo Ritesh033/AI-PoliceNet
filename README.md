@@ -124,6 +124,7 @@ AI-PoliceNet/
 │   ├── logging/
 │   └── backup-recovery/
 ├── frontend/
+│   ├── console/              # DEMO-only Overview console (React + TypeScript, mock data)
 │   ├── citizen-portal/
 │   ├── police-dashboard/
 │   ├── government-dashboard/
@@ -241,6 +242,19 @@ open http://localhost:3001
 # Access the admin panel
 open http://localhost:3002
 ```
+
+### Try the demo console (no backend needed)
+
+The Overview console is a standalone React + TypeScript prototype that runs entirely on
+mock data. It makes no network calls and connects to no social-media account or police system.
+
+```bash
+cd frontend/console
+npm install
+npm run dev        # http://localhost:3100
+```
+
+See [`frontend/console/README.md`](frontend/console/README.md) for details.
 
 ---
 

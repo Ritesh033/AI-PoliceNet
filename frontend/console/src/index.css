@@ -1,0 +1,201 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens. Chart series colours are the validated categorical slots 1-5
+ * (adjacent-pair CVD and normal-vision gates pass in both modes). Status colours are fixed
+ * and always ship with an icon and a text label, never colour alone.
+ */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f3f2ee;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #66655f;
+  --line: #e1e0d9;
+  --axis: #c3c2b7;
+  --ring: rgba(11, 11, 11, 0.1);
+  --accent: #1c5cab;
+  --accent-ink: #ffffff;
+  --accent-soft: #e4eefb;
+  --accent-text: #1c5cab;
+  --crit: #d03b3b;
+  --crit-soft: #fbe9e9;
+  --warn: #fab219;
+  --warn-soft: #fdf3dc;
+  --warn-ink: #8a5a00;
+  --ok-text: #006300;
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --s4: #eda100;
+  --s5: #e87ba4;
+  --seq: #2a78d6;
+  --seq-track: #cde2fb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --ink-3: #a3a198;
+    --line: #2c2c2a;
+    --axis: #383835;
+    --ring: rgba(255, 255, 255, 0.1);
+    --accent: #6da7ec;
+    --accent-ink: #0b0b0b;
+    --accent-soft: #1b2a3e;
+    --accent-text: #86b6ef;
+    --crit-soft: #3a1c1c;
+    --warn-soft: #3a2f12;
+    --warn-ink: #fab219;
+    --ok-text: #0ca30c;
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --s4: #c98500;
+    --s5: #d55181;
+    --seq: #3987e5;
+    --seq-track: #1b2a3e;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --ink-3: #a3a198;
+  --line: #2c2c2a;
+  --axis: #383835;
+  --ring: rgba(255, 255, 255, 0.1);
+  --accent: #6da7ec;
+  --accent-ink: #0b0b0b;
+  --accent-soft: #1b2a3e;
+  --accent-text: #86b6ef;
+  --crit-soft: #3a1c1c;
+  --warn-soft: #3a2f12;
+  --warn-ink: #fab219;
+  --ok-text: #0ca30c;
+  --s1: #3987e5;
+  --s2: #d95926;
+  --s3: #199e70;
+  --s4: #c98500;
+  --s5: #d55181;
+  --seq: #3987e5;
+  --seq-track: #1b2a3e;
+}
+
+@theme inline {
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+  --color-crit: var(--crit);
+  --color-crit-soft: var(--crit-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-ink: var(--warn-ink);
+  --color-ok-text: var(--ok-text);
+}
+
+html {
+  background: var(--page);
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--ring);
+  border-radius: 12px;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only-focusable:not(:focus):not(:focus-within) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Recharts chrome follows the tokens. */
+.recharts-cartesian-axis-tick-value {
+  fill: var(--ink-3);
+  font-size: 12px;
+}
+
+.recharts-tooltip-cursor {
+  fill: var(--accent-soft);
+  opacity: 0.55;
+}
+
+.live-dot {
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Forced-colors / high-contrast: keep marks visible and rely on text + icons. */
+@media (forced-colors: active) {
+  .card {
+    border-color: CanvasText;
+  }
+}
