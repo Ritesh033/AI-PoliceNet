@@ -1,3 +1,4 @@
+import itertools
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -24,11 +25,31 @@ class Clock:
         self.now += timedelta(**kwargs)
 
 
+_counter = itertools.count(1)
+FINDINGS = ("media_source", "edit_detection", "full_context", "cross_platform_copies")
+
+
+def fingerprint() -> str:
+    return f"fp-{next(_counter):08d}"
+
+
+def alert_kwargs(**overrides) -> dict:
+    params = dict(
+        category=Category.THREAT, title="Reported threat", summary="Spoken threat in a public video",
+        confidence=0.87, content_fingerprint=fingerprint(), behaviors=["threat"], priority="urgent",
+        signals=["explicit reference to harm"], evidence=[{"label": "video", "sha256": HASH}],
+        affected_party_id="cit-1",
+    )
+    params.update(overrides)
+    return params
+
+
 def actor(role: Role, ident: str | None = None) -> Actor:
     return Actor(id=ident or role.value, role=role)
 
 
 AI = actor(Role.AI_SERVICE, "model-v1")
+SYSTEM = actor(Role.SYSTEM, "scheduler")
 REVIEWER = actor(Role.REVIEWER, "rev-1")
 OFFICER = actor(Role.AUTHORIZED_OFFICER, "off-1")
 SUPERVISOR = actor(Role.SUPERVISORY_AUTHORITY, "sup-1")
@@ -62,18 +83,29 @@ def svc(session, clock) -> CaseService:
     return CaseService(session, clock, settings)
 
 
+def new_alert(svc, **overrides):
+    """Raise an alert that passes the flagging policy and return the new case."""
+    result = svc.create_alert(AI, **alert_kwargs(**overrides))
+    assert result.case is not None and result.outcome == "flagged", result
+    return result.case
+
+
+def complete_context(svc, case, outcome: str = "supports_flag") -> None:
+    """The AI finishes its full-context research and a human acknowledges it."""
+    for key in FINDINGS:
+        svc.add_context_finding(AI, case.id, key=key, outcome=outcome, summary=f"{key} examined")
+    svc.act(REVIEWER, case.id, "record_check", check="context")
+
+
 @pytest.fixture
 def social_case(svc):
-    return svc.create_alert(
-        AI, category=Category.THREAT, title="Reported threat", summary="Spoken threat in a public video",
-        confidence=0.87, priority="urgent", signals=["explicit reference to harm"],
-        evidence=[{"label": "video", "sha256": HASH}], affected_party_id="cit-1",
-    )
+    return new_alert(svc)
 
 
 @pytest.fixture
 def referred_case(svc, social_case):
     svc.act(REVIEWER, social_case.id, "assign")
+    complete_context(svc, social_case)
     svc.act(REVIEWER, social_case.id, "refer", note="context verified")
     return social_case
 

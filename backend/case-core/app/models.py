@@ -20,6 +20,9 @@ class Case(Base):
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
     stage: Mapped[str] = mapped_column(String(24), default="received")
     signals: Mapped[list] = mapped_column(JSON, default=list)
+    behaviors: Mapped[list] = mapped_column(JSON, default=list)
+    # The flag attaches to a specific piece of content (an opaque fingerprint from the AI service), never to a person.
+    content_fingerprint: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     # People. Subjects can never act on the case; parties can respond to it.
     subject_ids: Mapped[list] = mapped_column(JSON, default=list)
     complainant_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -32,6 +35,13 @@ class Case(Base):
     response_received: Mapped[bool] = mapped_column(Boolean, default=False)
     court_reviewed: Mapped[bool] = mapped_column(Boolean, default=False)
     appeal_open: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Decision clock: a human must take the case to an authorized decision by this time, else it escalates.
+    decision_due_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    sla_breached: Mapped[bool] = mapped_column(Boolean, default=False)
+    fir_registered_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    linked_to: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    fresh_registration_permitted: Mapped[bool] = mapped_column(Boolean, default=False)
+    dismissal_recommended: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[str] = mapped_column(String(40))
     updated_at: Mapped[str] = mapped_column(String(40))
 
@@ -45,7 +55,8 @@ class CaseItem(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     case_id: Mapped[str] = mapped_column(ForeignKey("cases.id"))
-    kind: Mapped[str] = mapped_column(String(16))  # evidence | response | advisory
+    kind: Mapped[str] = mapped_column(String(16))  # evidence | response | advisory | context_finding
+    outcome: Mapped[str | None] = mapped_column(String(24), nullable=True)
     label: Mapped[str] = mapped_column(String(200))
     sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     description: Mapped[str] = mapped_column(Text, default="")

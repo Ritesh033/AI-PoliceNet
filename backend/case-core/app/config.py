@@ -9,6 +9,7 @@ class Settings:
     env: str
     database_url: str
     response_window_days: int
+    decision_sla_hours: int
     checkpoint_key: str
 
 
@@ -17,5 +18,6 @@ def get_settings() -> Settings:
         env=os.getenv("APN_ENV", ""),
         database_url=os.getenv("DATABASE_URL", "sqlite:///./case_core.db"),
         response_window_days=int(os.getenv("APN_RESPONSE_WINDOW_DAYS", "10")),
+        decision_sla_hours=int(os.getenv("APN_DECISION_SLA_HOURS", "24")),
         checkpoint_key=os.getenv("APN_CHECKPOINT_KEY", ""),
     )

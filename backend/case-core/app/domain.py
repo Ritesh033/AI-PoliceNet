@@ -16,6 +16,7 @@ from enum import Enum
 
 class Role(str, Enum):
     AI_SERVICE = "ai_service"
+    SYSTEM = "system"
     REVIEWER = "reviewer"
     AUTHORIZED_OFFICER = "authorized_officer"
     SUPERVISORY_AUTHORITY = "supervisory_authority"
@@ -26,6 +27,7 @@ class Role(str, Enum):
 
 class Kind(str, Enum):
     AI = "ai"
+    SYSTEM = "system"
     HUMAN = "human"
 
 
@@ -37,6 +39,7 @@ class Stage(str, Enum):
     FIR_REGISTERED = "fir_registered"
     CLOSED_NO_ACTION = "closed_no_action"
     CLOSED_BY_COURT = "closed_by_court"
+    LINKED = "linked"  # merged into another case as supplementary information
 
 
 class CaseKind(str, Enum):
@@ -57,6 +60,43 @@ class Category(str, Enum):
 # Categories whose media must never be previewed, only hashed.
 SENSITIVE_CATEGORIES = frozenset({Category.NCII})
 
+# --- Flagging policy -------------------------------------------------------------------------------------------
+# What the AI may flag is a *policy*, owned by legal experts, not an engineering decision. The default below follows
+# the product rule that lies and personal abuse alone are not flagged. A flag needs at least one actionable behaviour.
+# Legal review must confirm this list: some abuse IS an offence (for example caste-based abuse in public, words
+# insulting a woman's modesty, threats, incitement against a community), which is why those are listed as actionable.
+NON_ACTIONABLE_ALONE = frozenset({"insult", "false_statement", "criticism"})
+ACTIONABLE_BEHAVIORS = frozenset(
+    {
+        "threat",
+        "extortion",
+        "fraud",
+        "impersonation",
+        "sexual_content",
+        "sexual_harassment",
+        "non_consensual_imagery",
+        "child_involved",
+        "incitement_to_violence",
+        "targeted_hate",
+        "self_admission",
+    }
+)
+KNOWN_BEHAVIORS = NON_ACTIONABLE_ALONE | ACTIONABLE_BEHAVIORS
+
+
+def should_flag(behaviors: "set[str] | frozenset[str] | list[str]") -> bool:
+    return bool(set(behaviors) & ACTIONABLE_BEHAVIORS)
+
+
+# Context the AI must have examined before any human can refer a social-media case: is the clip from a film, show
+# or skit; has it been edited or cut; what is the full original; where else does it appear.
+REQUIRED_CONTEXT_FINDINGS = frozenset({"media_source", "edit_detection", "full_context", "cross_platform_copies"})
+FINDING_OUTCOMES = frozenset({"supports_flag", "undermines_flag", "inconclusive"})
+CONTEXT_GATED_ACTIONS = frozenset({"refer", "register_fir"})
+
+# Stages where a human has not yet taken the case to an authorized decision. The decision clock watches these.
+UNDECIDED_STAGES = frozenset({Stage.RECEIVED, Stage.IN_REVIEW, Stage.REFERRED})
+
 # Checks a human must record before a self-uploaded confession video can go further.
 CONFESSION_REQUIRED_CHECKS = frozenset({"wellbeing", "authenticity"})
 KNOWN_CHECKS = frozenset({"wellbeing", "authenticity", "real_world_match", "context"})
@@ -69,7 +109,11 @@ class Actor:
 
     @property
     def kind(self) -> Kind:
-        return Kind.AI if self.role is Role.AI_SERVICE else Kind.HUMAN
+        if self.role is Role.AI_SERVICE:
+            return Kind.AI
+        if self.role is Role.SYSTEM:
+            return Kind.SYSTEM
+        return Kind.HUMAN
 
     @property
     def is_staff(self) -> bool:
@@ -119,6 +163,10 @@ ACTIONS: dict[str, ActionSpec] = {
     "serve_notice": _spec({_R.AUTHORIZED_OFFICER}, {_S.FIR_REGISTERED}, None, False),
     "court_proceed": _spec({_R.JUDICIAL_AUTHORITY}, {_S.FIR_REGISTERED}, None, True),
     "court_close": _spec({_R.JUDICIAL_AUTHORITY}, {_S.FIR_REGISTERED}, _S.CLOSED_BY_COURT, True),
+    # New information about the same clip or issue is added to the existing case; it never opens a second FIR.
+    "link_supplementary": _spec({_R.REVIEWER}, {_S.RECEIVED, _S.IN_REVIEW}, _S.LINKED, True),
+    # A court may allow a fresh registration on the same clip (for example when the full original surfaces later).
+    "permit_fresh_registration": _spec({_R.JUDICIAL_AUTHORITY}, {_S.CLOSED_BY_COURT}, None, True),
     "appeal": _spec(
         {_R.CITIZEN},
         {_S.FIR_REGISTERED, _S.CLOSED_NO_ACTION, _S.CLOSED_BY_COURT},

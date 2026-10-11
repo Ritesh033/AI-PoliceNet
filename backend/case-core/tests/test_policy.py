@@ -3,7 +3,10 @@ import pytest
 from app.domain import ACTIONS, Category, PolicyViolation, Role, Stage
 from app.ledger import Ledger
 
-from .conftest import AI, AUDITOR, CITIZEN, HASH, HASH2, JUDGE, OFFICER, REVIEWER, SUPERVISOR, actor
+from .conftest import (
+    AI, AUDITOR, CITIZEN, HASH, HASH2, JUDGE, OFFICER, REVIEWER, SUPERVISOR, SYSTEM, actor, alert_kwargs,
+    complete_context, new_alert,
+)
 
 
 def code(exc: pytest.ExceptionInfo) -> str:
@@ -12,10 +15,11 @@ def code(exc: pytest.ExceptionInfo) -> str:
 
 # ----------------------------------------------------------- AI cannot decide
 
+@pytest.mark.parametrize("who", [AI, SYSTEM], ids=["ai_service", "scheduler"])
 @pytest.mark.parametrize("action", sorted(ACTIONS))
-def test_ai_cannot_perform_any_workflow_action(svc, social_case, action):
+def test_automated_actors_cannot_perform_any_workflow_action(svc, social_case, action, who):
     with pytest.raises(PolicyViolation) as exc:
-        svc.act(AI, social_case.id, action, note="x", check="wellbeing")
+        svc.act(who, social_case.id, action, note="x", check="wellbeing", link_to="APN-1001")
     assert code(exc) == "ai_cannot_decide"
 
 
@@ -30,7 +34,7 @@ def test_ai_advisory_is_recorded_but_never_moves_a_case(svc, session, social_cas
 
 def test_only_ai_can_raise_alerts_and_only_citizens_file_complaints(svc):
     with pytest.raises(PolicyViolation):
-        svc.create_alert(REVIEWER, category=Category.THREAT, title="t", summary="s", confidence=0.5)
+        svc.create_alert(REVIEWER, **alert_kwargs())
     with pytest.raises(PolicyViolation):
         svc.file_complaint(OFFICER, title="t", summary="s", subject_ids=["x"])
 
@@ -176,15 +180,16 @@ def test_conduct_complaint_cannot_jump_straight_to_an_fir(svc, complaint):
 
 @pytest.fixture
 def confession(svc):
-    return svc.create_alert(
-        AI, category=Category.SELF_CONFESSION_VIDEO, title="Self-uploaded confession video",
+    return new_alert(
+        svc, category=Category.SELF_CONFESSION_VIDEO, title="Self-uploaded confession video",
         summary="Public video in which the poster says they committed an offence", confidence=0.7,
-        evidence=[{"label": "video", "sha256": HASH}],
+        behaviors=["self_admission"], priority="routine",
     )
 
 
 def test_confession_video_needs_human_wellbeing_and_authenticity_checks_before_referral(svc, confession):
     svc.act(REVIEWER, confession.id, "assign")
+    complete_context(svc, confession)
     with pytest.raises(PolicyViolation) as exc:
         svc.act(REVIEWER, confession.id, "refer", note="looks real")
     assert code(exc) == "checks_incomplete"
@@ -212,7 +217,7 @@ def test_no_flag_or_strike_state_exists_that_could_block_judicial_relief(svc, fi
         assert "strike" not in names and "lock" not in names and "permanent" not in names
     # Many alerts and cases against the same person change nothing about what a court can do.
     for _ in range(8):
-        svc.create_alert(AI, category=Category.THREAT, title="t", summary="s", confidence=0.9, affected_party_id="cit-1")
+        new_alert(svc)
     svc.act(JUDGE, fir_case.id, "court_close", note="court retains full power regardless of how many alerts exist")
     assert fir_case.stage == Stage.CLOSED_BY_COURT.value
 
@@ -224,9 +229,9 @@ def test_no_action_closes_and_is_recorded(svc, social_case):
 
 def test_hash_validation_and_text_validation(svc):
     with pytest.raises(PolicyViolation) as exc:
-        svc.create_alert(AI, category=Category.THREAT, title="t", summary="s", confidence=0.5, evidence=[{"label": "x", "sha256": "nope"}])
+        svc.create_alert(AI, **alert_kwargs(evidence=[{"label": "x", "sha256": "nope"}]))
     assert code(exc) == "bad_hash"
     with pytest.raises(PolicyViolation):
-        svc.create_alert(AI, category=Category.THREAT, title=" ", summary="s", confidence=0.5)
+        svc.create_alert(AI, **alert_kwargs(title=" "))
     with pytest.raises(PolicyViolation):
-        svc.create_alert(AI, category=Category.THREAT, title="t", summary="s", confidence=1.5)
+        svc.create_alert(AI, **alert_kwargs(confidence=1.5))

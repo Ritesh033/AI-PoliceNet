@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -10,7 +10,7 @@ from .db import init_db, make_engine, make_session_factory
 from .domain import Actor, PolicyViolation, Role
 from .ledger import Ledger
 from .models import Case, CaseItem, LedgerEntry
-from .schemas import ActionIn, AdvisoryIn, AlertIn, ComplaintIn, ResponseIn
+from .schemas import ActionIn, AdvisoryIn, AlertIn, ComplaintIn, ContextFindingIn, ResponseIn
 from .service import CaseService
 
 
@@ -66,18 +66,25 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
 
     def item_out(i: CaseItem) -> dict:
         return {
-            "id": i.id, "kind": i.kind, "label": i.label, "description": i.description,
+            "id": i.id, "kind": i.kind, "label": i.label, "outcome": i.outcome, "description": i.description,
             "sha256": i.sha256, "preview_withheld": i.preview_withheld, "late": i.late,
             "added_by": i.added_by, "added_at": i.added_at,
         }
 
     def case_out(c: Case, actor: Actor) -> dict:
+        findings = [i for i in c.items if i.kind == "context_finding"]
         out = {
             "id": c.id, "kind": c.kind, "category": c.category, "title": c.title, "summary": c.summary,
             "priority": c.priority, "confidence": c.confidence, "stage": c.stage, "signals": c.signals,
+            "behaviors": c.behaviors, "content_fingerprint": c.content_fingerprint,
             "checks": c.checks, "referred_to_role": c.referred_to_role, "notice_served_at": c.notice_served_at,
             "window_closes_at": c.window_closes_at, "response_received": c.response_received,
             "court_reviewed": c.court_reviewed, "appeal_open": c.appeal_open,
+            "decision_due_at": c.decision_due_at, "sla_breached": c.sla_breached,
+            "linked_to": c.linked_to, "dismissal_recommended": c.dismissal_recommended,
+            "fresh_registration_permitted": c.fresh_registration_permitted,
+            "context_missing": CaseService.missing_context(c) if c.kind == "social" else [],
+            "context_findings_undermining_flag": sum(1 for f in findings if f.outcome == "undermines_flag"),
             "created_at": c.created_at, "updated_at": c.updated_at,
             "items": [item_out(i) for i in c.items],
             # AI output is advisory and says so on every case.
@@ -100,11 +107,15 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
     def health() -> dict:
         return {"status": "ok", "auth": "demo-stub" if get_settings().env == "demo" else "not-configured"}
 
-    @app.post("/alerts", status_code=201)
-    def create_alert(body: AlertIn, actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)) -> dict:
-        data = body.model_dump()
-        data["evidence"] = [e for e in data["evidence"]]
-        return case_out(svc.create_alert(actor, **data), actor)
+    @app.post("/alerts")
+    def create_alert(
+        body: AlertIn, response: Response, actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)
+    ) -> dict:
+        result = svc.create_alert(actor, **body.model_dump())
+        # 201 only when a new case is opened. A policy drop or an attach to an existing case is a 200.
+        response.status_code = 201 if result.outcome == "flagged" else 200
+        out = case_out(result.case, actor) if result.case is not None else {}
+        return {**out, "outcome": result.outcome, "reason": result.reason}
 
     @app.post("/complaints", status_code=201)
     def file_complaint(body: ComplaintIn, actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)) -> dict:
@@ -123,7 +134,13 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
 
     @app.post("/cases/{case_id}/actions")
     def act(case_id: str, body: ActionIn, actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)) -> dict:
-        return case_out(svc.act(actor, case_id, body.action, body.note, body.check), actor)
+        return case_out(svc.act(actor, case_id, body.action, body.note, body.check, body.link_to), actor)
+
+    @app.post("/cases/{case_id}/context-findings", status_code=201)
+    def context_finding(
+        case_id: str, body: ContextFindingIn, actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)
+    ) -> dict:
+        return item_out(svc.add_context_finding(actor, case_id, **body.model_dump()))
 
     @app.post("/cases/{case_id}/advisory", status_code=201)
     def advisory(case_id: str, body: AdvisoryIn, actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)) -> dict:
@@ -140,6 +157,29 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
         return {
             "note": "A passed window never changes a case. These need a human to confirm notice was served and follow up.",
             "cases": [case_out(c, actor) for c in svc.window_elapsed_cases()],
+        }
+
+    @app.get("/attention/overdue-decisions")
+    def overdue(actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)) -> dict:
+        if not actor.is_staff:
+            raise PolicyViolation("forbidden", "Staff only", 403)
+        return {
+            "note": "These missed the human-decision deadline and go to a supervisory authority. Nothing is filed automatically.",
+            "cases": [case_out(c, actor) for c in svc.overdue_decisions()],
+        }
+
+    @app.post("/attention/sweep")
+    def sweep(actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)) -> dict:
+        breached = svc.sweep_deadlines(actor)
+        return {"newly_breached": [c.id for c in breached]}
+
+    @app.get("/attention/dismissal-recommendations")
+    def dismissal_recommendations(actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)) -> dict:
+        if actor.role not in (Role.JUDICIAL_AUTHORITY, Role.AUDITOR):
+            raise PolicyViolation("forbidden", "For judicial authorities and auditors", 403)
+        return {
+            "note": "The AI's continuing research recommends dismissal on these FIRs. Only a judicial authority can act.",
+            "cases": [case_out(c, actor) for c in svc.dismissal_recommendations()],
         }
 
     def require_oversight(actor: Actor) -> None:

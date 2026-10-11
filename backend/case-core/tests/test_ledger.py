@@ -7,7 +7,7 @@ from app.ledger import Ledger, verify_checkpoint
 from app.models import Case
 from app.service import CaseService
 
-from .conftest import AI, HASH, REVIEWER
+from .conftest import HASH, REVIEWER, new_alert
 
 
 def test_empty_ledger_is_valid(session):
@@ -84,9 +84,9 @@ def test_every_decision_is_attributed_to_a_human_and_ai_alerts_to_the_ai(svc, se
 
 
 def test_sensitive_evidence_stores_hash_only_and_marks_preview_withheld(svc):
-    case = svc.create_alert(
-        AI, category=Category.NCII, title="Suspected NCII", summary="Flagged by classifier", confidence=0.9,
-        evidence=[{"label": "clip", "sha256": HASH}],
+    case = new_alert(
+        svc, category=Category.NCII, title="Suspected NCII", summary="Flagged by classifier", confidence=0.9,
+        behaviors=["non_consensual_imagery"], evidence=[{"label": "clip", "sha256": HASH}],
     )
     item = case.items[0]
     assert item.preview_withheld and item.sha256 == HASH
