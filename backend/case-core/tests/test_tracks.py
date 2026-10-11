@@ -54,15 +54,20 @@ def departmental_case(svc, parties=(OFFICIAL, HELPER, POSTER), behaviors=("abuse
     return case
 
 
+def handler_for(case):
+    """The authority that deals with the people in a case: the supervisory authority on a departmental case."""
+    return SUPERVISOR if case.track == "departmental" else OFFICER
+
+
 def determine(svc, case, party, determination="subject"):
     return svc.act(
-        OFFICER, case.id, "determine_party", note="decided on the facts",
+        handler_for(case), case.id, "determine_party", note="decided on the facts",
         party_ref=party["ref"], party_role=party["role"], determination=determination,
     )
 
 
 def notice(svc, case, party):
-    return svc.act(OFFICER, case.id, "serve_notice", party_ref=party["ref"])
+    return svc.act(handler_for(case), case.id, "serve_notice", party_ref=party["ref"])
 
 
 def challan(svc, case, party, amount=10_000, who=OFFICER):
@@ -152,6 +157,24 @@ def test_one_clip_can_have_a_case_on_each_track_but_still_only_one_fir(svc):
 
 
 # --------------------------------------------------------------------- civic: the challan
+
+def test_the_supervisory_authority_not_the_force_being_filmed_deals_with_the_people_on_a_departmental_case(svc):
+    case = departmental_case(svc)
+    for action, extra in (
+        ("determine_party", dict(party_ref=OFFICIAL["ref"], party_role=OFFICIAL["role"], determination="subject")),
+        ("serve_notice", dict(party_ref=OFFICIAL["ref"])),
+    ):
+        with pytest.raises(PolicyViolation) as exc:
+            svc.act(OFFICER, case.id, action, note="x", **extra)
+        assert code(exc) == "wrong_handler"
+    determine(svc, case, OFFICIAL)
+    assert notice(svc, case, OFFICIAL).issued_response_token
+    # And on every other track the supervisory authority does not take over the officer's part.
+    civic = civic_case(svc)
+    with pytest.raises(PolicyViolation) as exc:
+        svc.act(SUPERVISOR, civic.id, "determine_party", note="x", party_ref=OWNER["ref"], party_role="vehicle_owner", determination="subject")
+    assert code(exc) == "role_not_permitted"
+
 
 def test_no_fir_can_ever_be_registered_on_a_civic_or_departmental_matter(svc):
     for case in (civic_case(svc), departmental_case(svc)):

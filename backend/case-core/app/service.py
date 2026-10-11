@@ -23,6 +23,7 @@ from .domain import (
     KNOWN_BEHAVIORS,
     KNOWN_SITUATIONS,
     OPTIONAL_FINDINGS,
+    PARTY_ACTIONS,
     PARTY_ROLES,
     REVIEW_THRESHOLDS,
     SANCTION_KINDS,
@@ -397,6 +398,16 @@ class CaseService:
 
         if action in ("issue_challan", "impose_sanction"):
             self._require_penalty_track(case, action)
+        if action in PARTY_ACTIONS:
+            departmental = case.track == Track.DEPARTMENTAL.value
+            if departmental and actor.role is not DEPARTMENTAL_REFERRAL_TARGET:
+                raise PolicyViolation(
+                    "wrong_handler",
+                    "A departmental matter is handled by the supervisory authority, never by the force being filmed.",
+                    403,
+                )
+            if not departmental and actor.role is Role.SUPERVISORY_AUTHORITY:
+                raise PolicyViolation("role_not_permitted", f"Role '{actor.role.value}' cannot perform '{action}' on this case", 403)
         # Handlers: the referred-to authority acts on a referred case, never a different arm of the system.
         if action in ("open_inquiry", "decline", "issue_challan", "impose_sanction") and actor.role.value != case.referred_to_role:
             raise PolicyViolation("wrong_handler", f"This case was referred to '{case.referred_to_role}'", 403)

@@ -342,18 +342,21 @@ ACTIONS: dict[str, ActionSpec] = {
     # For a criminal case a notice follows an FIR. For a civic or departmental case it can be served once the case is
     # referred (see CaseService._authorize_notice).
     "serve_notice": _spec(
-        {_R.AUTHORIZED_OFFICER}, {_S.REFERRED, _S.INQUIRY, _S.FIR_REGISTERED, _S.PENALTY_RECORDED}, None, False
+        {_R.AUTHORIZED_OFFICER, _R.SUPERVISORY_AUTHORITY},
+        {_S.REFERRED, _S.INQUIRY, _S.FIR_REGISTERED, _S.PENALTY_RECORDED}, None, False,
     ),
     "court_proceed": _spec({_R.JUDICIAL_AUTHORITY}, {_S.FIR_REGISTERED}, None, True),
     "court_close": _spec({_R.JUDICIAL_AUTHORITY}, {_S.FIR_REGISTERED}, _S.CLOSED_BY_COURT, True),
     # Only a human officer decides who is a subject, a victim or a witness, within the scenario rules above.
     "determine_party": _spec(
-        {_R.AUTHORIZED_OFFICER}, {_S.REFERRED, _S.INQUIRY, _S.FIR_REGISTERED, _S.PENALTY_RECORDED}, None, True
+        {_R.AUTHORIZED_OFFICER, _R.SUPERVISORY_AUTHORITY},
+        {_S.REFERRED, _S.INQUIRY, _S.FIR_REGISTERED, _S.PENALTY_RECORDED}, None, True,
     ),
     # Identifying a person behind an account is a legal-process step by an officer, recorded here with its legal basis.
     # The platform itself never looks up, stores or messages anyone's contact details.
     "request_identification": _spec(
-        {_R.AUTHORIZED_OFFICER}, {_S.REFERRED, _S.INQUIRY, _S.FIR_REGISTERED, _S.PENALTY_RECORDED}, None, True
+        {_R.AUTHORIZED_OFFICER, _R.SUPERVISORY_AUTHORITY},
+        {_S.REFERRED, _S.INQUIRY, _S.FIR_REGISTERED, _S.PENALTY_RECORDED}, None, True,
     ),
     # New information about the same clip or issue is added to the existing case; it never opens a second FIR.
     "link_supplementary": _spec({_R.REVIEWER}, {_S.RECEIVED, _S.IN_REVIEW}, _S.LINKED, True),
@@ -430,8 +433,12 @@ REFERRAL_TARGET: dict[CaseKind, Role] = {
     CaseKind.SOCIAL: Role.AUTHORIZED_OFFICER,
     CaseKind.CONDUCT: Role.SUPERVISORY_AUTHORITY,
 }
-# A departmental case about an official goes to the supervisory authority, never to the force being filmed.
+# A departmental case about an official goes to the supervisory authority, never to the force being filmed. The same
+# authority decides who is who, serves the notice and records any sanction on that case; an authorized officer (the
+# police) does none of these on it, because the force being filmed must not decide its own members' case.
 DEPARTMENTAL_REFERRAL_TARGET = Role.SUPERVISORY_AUTHORITY
+# The actions that deal with the people in a case. On every other track they stay with the authorized officer.
+PARTY_ACTIONS = frozenset({"determine_party", "serve_notice", "request_identification"})
 
 # Actions a reviewer cannot skip past for confession videos.
 CONFESSION_GATED_ACTIONS = frozenset({"refer", "register_fir"})

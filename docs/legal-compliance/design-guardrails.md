@@ -61,7 +61,8 @@ that is fixed when it opens, and the track decides what can follow.
 - **Official misconduct that is not an offence in itself** (stopping people and fining them without papers or inquiry,
   keeping private persons alongside to do official work, rude or arbitrary conduct) is considered only when the clip
   shows a person acting in an official capacity, and never when it is a film scene. It goes to the supervisory
-  authority, not to the force being filmed. A competent authority can record a **sanction** (warning, fine,
+  authority, not to the force being filmed, and that authority (never an authorized police officer) decides who is who and
+  serves the notices on the case. A competent authority can record a **sanction** (warning, fine,
   suspension, licence or contract cancellation, removal order) against **each** person decided to be a subject: the
   official, a private person acting for them, a contractor or licensee. Whoever posted the clip, or was treated that
   way, is never one.

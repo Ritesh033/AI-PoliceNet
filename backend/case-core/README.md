@@ -43,7 +43,7 @@ Every case is on one **track**, fixed when it opens. Only a `criminal` case can 
 | --- | --- | --- | --- |
 | `criminal` | An offence (threat, bribe demand, beating, intimate imagery without consent, ...) | An FIR registered by an authorized officer | |
 | `civic` | Parking that blocks a road, spitting, urinating on a public wall, dumping waste in a river | `issue_challan` by an authorized officer, to each person decided to be a subject | An FIR; counted as a flag |
-| `departmental` | Official misconduct that is not an offence in itself (using power without papers or inquiry, private persons doing official work, official misbehaviour), only when the clip shows a person acting in an official capacity | `impose_sanction` by the supervisory authority, to each person decided to be a subject, after a notice (and a hearing for a fine, licence cancellation or removal) | An FIR; a sanction by software |
+| `departmental` | Official misconduct that is not an offence in itself (using power without papers or inquiry, private persons doing official work, official misbehaviour), only when the clip shows a person acting in an official capacity | `impose_sanction` by the supervisory authority, to each person decided to be a subject, after a notice (and a hearing for a fine, licence cancellation or removal). The supervisory authority also decides who is who and serves the notice on these cases; the police never do, because the force being filmed must not decide its own members' case | An FIR; a sanction by software |
 
 A count of recorded warnings and fines against the same public servant asks a supervisory authority for a written
 review at 3 (`interim_suspension_review`) and at 7 (`removal_inquiry_review`). The count suspends, removes and fines
