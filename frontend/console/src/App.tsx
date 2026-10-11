@@ -25,12 +25,14 @@ import { ComplaintsPanel } from './components/ComplaintsPanel';
 import { LiveFeed } from './components/LiveFeed';
 import { DecisionLayers } from './components/DecisionLayers';
 import { Icon } from './components/Icon';
+import { LiveCases } from './components/live/LiveCases';
 
 const TABS: readonly TabDef[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'social', label: 'Social media' },
   { id: 'accountability', label: 'Accountability' },
   { id: 'legal', label: 'Legal cases' },
+  { id: 'live', label: 'Case core (live)' },
 ];
 
 const PLANNED = {
@@ -148,8 +150,12 @@ export function App({ simulateLive = true }: { simulateLive?: boolean }) {
       <main id="main" className="mx-auto max-w-[1400px] px-4 pb-10 pt-5 sm:px-6">
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-ink">Overview</h1>
-            <p className="text-sm text-ink-2">Sample figures · illustrative period · human review required for every action</p>
+            <h1 className="text-2xl font-semibold text-ink">{TABS.find((t) => t.id === tab)?.label}</h1>
+            <p className="text-sm text-ink-2">
+              {tab === 'live'
+                ? 'Sample data from a case-core API you run locally · demo sign-in · human review required for every action'
+                : 'Sample figures · illustrative period · human review required for every action'}
+            </p>
           </div>
         </div>
 
@@ -257,6 +263,10 @@ export function App({ simulateLive = true }: { simulateLive?: boolean }) {
             </div>
 
             <DecisionLayers />
+          </div>
+        ) : tab === 'live' ? (
+          <div role="tabpanel" id="panel-live" aria-labelledby="tab-live">
+            <LiveCases now={now} />
           </div>
         ) : (
           <Placeholder id={tab} {...PLANNED[tab as keyof typeof PLANNED]} />

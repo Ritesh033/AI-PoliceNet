@@ -12,13 +12,15 @@ and a **tamper-evident ledger** that records every step.
 cd backend/case-core
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
-python -m pytest -q                                   # 117 tests
-APN_ENV=demo APN_CHECKPOINT_KEY=change-me uvicorn app.main:app --port 8100
+python -m pytest -q                                   # 122 tests
+APN_ENV=demo APN_CHECKPOINT_KEY=change-me python -m app.demo_seed      # optional: 7 invented sample cases
+APN_ENV=demo APN_CHECKPOINT_KEY=change-me APN_CORS_ORIGINS=http://localhost:3100 uvicorn app.main:app --port 8100
 # interactive docs: http://localhost:8100/docs
 ```
 
 Environment: `APN_ENV` (must be `demo`), `DATABASE_URL` (default SQLite file), `APN_RESPONSE_WINDOW_DAYS`
-(default 10), `APN_DECISION_SLA_HOURS` (default 24), `APN_CHECKPOINT_KEY` (signs ledger checkpoints).
+(default 10), `APN_DECISION_SLA_HOURS` (default 24), `APN_CHECKPOINT_KEY` (signs ledger checkpoints),
+`APN_CORS_ORIGINS` (comma-separated browser origins allowed to call the API, such as the console; none by default).
 
 Demo auth: send `X-Actor-Id` and `X-Actor-Role` (`ai_service`, `system` (scheduler), `reviewer`,
 `authorized_officer`, `supervisory_authority`, `judicial_authority`, `citizen`, `auditor`).
@@ -43,6 +45,7 @@ received -> in_review -> referred -> inquiry -> fir_registered -> closed_by_cour
 | `POST /attention/sweep`, `GET /attention/overdue-decisions` | Scheduler, staff | Records once that a case missed its 24-hour human-decision deadline and must go to a supervisor. Files nothing. |
 | `GET /attention/dismissal-recommendations` | Judicial authority, auditor | FIRs where the AI's continuing research recommends dismissal. Only a court can act. |
 | `GET /ledger`, `/ledger/verify`, `/ledger/checkpoint` | Auditor, judicial authority | Read, verify and sign the audit chain. |
+| `GET /meta/actions` | Any identity | The workflow rules (roles, stages, required notes and inputs) straight from the code that enforces them, so clients never keep a drifting copy. |
 
 ## Guardrails (each is a test)
 
@@ -84,4 +87,4 @@ civil-society archive). Corrections are new entries that reference the old ones;
 - Real authentication: OIDC, MFA, role assignment and revocation.
 - PostgreSQL deployment, including append-only triggers (SQLite triggers exist and are tested).
 - External checkpoint publishing; evidence vault storage; notification delivery for served notices.
-- Persisting review notes and checks from the console UI (the console still runs on mock data).
+- The console's Overview charts and counts still run on mock data; only its "Case core (live)" tab uses this API.

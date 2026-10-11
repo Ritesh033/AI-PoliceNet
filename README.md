@@ -255,7 +255,8 @@ npm install
 npm run dev        # http://localhost:3100
 ```
 
-See [`frontend/console/README.md`](frontend/console/README.md) for details.
+See [`frontend/console/README.md`](frontend/console/README.md) for details, including the "Case core (live)" tab that
+connects to the local [`backend/case-core`](backend/case-core) API.
 
 ---
 

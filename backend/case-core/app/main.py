@@ -2,12 +2,13 @@ from collections.abc import Iterator
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, sessionmaker
 
 from .config import get_settings
 from .db import init_db, make_engine, make_session_factory
-from .domain import Actor, PolicyViolation, Role
+from .domain import ACTION_PARAMS, ACTIONS, KNOWN_CHECKS, Actor, PolicyViolation, Role
 from .ledger import Ledger
 from .models import Case, CaseItem, LedgerEntry
 from .schemas import ActionIn, AdvisoryIn, AlertIn, ComplaintIn, ContextFindingIn, ResponseIn
@@ -34,6 +35,13 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    origins = get_settings().cors_origins
+    if origins:
+        # Only the listed origins (for example the console on localhost) may call the API from a browser.
+        app.add_middleware(
+            CORSMiddleware, allow_origins=list(origins), allow_methods=["GET", "POST"], allow_headers=["*"]
+        )
 
     def db() -> Iterator[Session]:
         session = holder["factory"]()
@@ -106,6 +114,23 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
     @app.get("/health")
     def health() -> dict:
         return {"status": "ok", "auth": "demo-stub" if get_settings().env == "demo" else "not-configured"}
+
+    @app.get("/meta/actions")
+    def meta_actions(_: Actor = Depends(current_actor)) -> dict:
+        """The workflow rules, straight from the code that enforces them, so clients never keep a drifting copy."""
+        return {
+            "actions": {
+                name: {
+                    "roles": sorted(r.value for r in spec.roles),
+                    "from_stages": sorted(s.value for s in spec.from_stages),
+                    "to_stage": spec.to_stage.value if spec.to_stage else None,
+                    "note_required": spec.note_required,
+                    "params": ACTION_PARAMS.get(name, []),
+                }
+                for name, spec in ACTIONS.items()
+            },
+            "checks": sorted(KNOWN_CHECKS),
+        }
 
     @app.post("/alerts")
     def create_alert(

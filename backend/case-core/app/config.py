@@ -11,6 +11,7 @@ class Settings:
     response_window_days: int
     decision_sla_hours: int
     checkpoint_key: str
+    cors_origins: tuple[str, ...] = ()
 
 
 def get_settings() -> Settings:
@@ -20,4 +21,5 @@ def get_settings() -> Settings:
         response_window_days=int(os.getenv("APN_RESPONSE_WINDOW_DAYS", "10")),
         decision_sla_hours=int(os.getenv("APN_DECISION_SLA_HOURS", "24")),
         checkpoint_key=os.getenv("APN_CHECKPOINT_KEY", ""),
+        cors_origins=tuple(o.strip() for o in os.getenv("APN_CORS_ORIGINS", "").split(",") if o.strip()),
     )

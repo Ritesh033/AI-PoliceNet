@@ -224,6 +224,9 @@ ACTIONS: dict[str, ActionSpec] = {
     ),
 }
 
+# Extra inputs an action needs besides the written note. Exposed so a client can render the right form.
+ACTION_PARAMS: dict[str, list[str]] = {"record_check": ["check"], "link_supplementary": ["link_to"]}
+
 # Who handles a referred case, by case kind. Conduct complaints never go to the force being complained about.
 REFERRAL_TARGET: dict[CaseKind, Role] = {
     CaseKind.SOCIAL: Role.AUTHORIZED_OFFICER,

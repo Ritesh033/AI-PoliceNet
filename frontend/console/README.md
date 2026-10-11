@@ -37,6 +37,30 @@ Requires Node 22+ (the test environment's `jsdom` dependency needs it).
 The **Social media**, **Accountability** and **Legal cases** tabs are placeholders that outline the
 planned modules.
 
+## Case core (live) tab
+
+The one tab that talks to a real service: the [`backend/case-core`](../../backend/case-core) API, which you run
+yourself. Everything stays local and uses invented sample data; sign-in is the API's demo header stub.
+
+```bash
+# terminal 1: the API, seeded with sample cases (CORS allows the console origin)
+cd backend/case-core && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+export APN_ENV=demo APN_CORS_ORIGINS=http://localhost:3100 APN_CHECKPOINT_KEY=change-me
+python -m app.demo_seed && uvicorn app.main:app --port 8100
+# terminal 2: this console
+cd frontend/console && npm run dev      # then open the "Case core (live)" tab and click Connect
+```
+
+What it shows, all enforced by the server and not by this page:
+
+- Cases with the human-decision deadline, the model's detected behaviours, and the full-context checklist (film or
+  show match, edits, full original, other copies) that must be complete before any referral.
+- Evidence as hashes only, with "preview withheld" for sensitive items.
+- Human decisions with a written reason. Switch **Act as** to a role that should not take a step and the server's
+  refusal appears verbatim (for example a reviewer trying to close an FIR, or the AI trying to register one).
+- AI advice marked non-binding, including a dismissal recommendation that only a court can act on.
+- The hash-chained ledger and a **Verify ledger integrity** button, for auditors and judicial authorities.
+
 ## Design decisions that follow the product rules
 
 - **AI is advisory.** Review actions (assign, request context, no action, refer) are always a human

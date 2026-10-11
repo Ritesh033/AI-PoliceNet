@@ -31,7 +31,7 @@ describe('Overview console', () => {
     const user = userEvent.setup();
     render(<App simulateLive={false} />);
     const tabs = screen.getAllByRole('tab');
-    expect(tabs.map((t) => t.textContent)).toEqual(['Overview', 'Social media', 'Accountability', 'Legal cases']);
+    expect(tabs.map((t) => t.textContent)).toEqual(['Overview', 'Social media', 'Accountability', 'Legal cases', 'Case core (live)']);
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
 
     screen.getByRole('tab', { name: 'Overview' }).focus();
