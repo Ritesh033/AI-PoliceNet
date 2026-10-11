@@ -59,6 +59,10 @@ What it shows, all enforced by the server and not by this page:
 - Human decisions with a written reason. Switch **Act as** to a role that should not take a step and the server's
   refusal appears verbatim (for example a reviewer trying to close an FIR, or the AI trying to register one).
 - AI advice marked non-binding, including a dismissal recommendation that only a court can act on.
+- **Who is who:** parties proposed by the AI and decided by an officer. The server refuses to name a victim a subject (or,
+  in a public indecent act, the person who filmed or posted it), and refuses to send a notice to anyone but a decided subject.
+- **Notice package:** after an officer records a notice, the full notice text and the private no-login response link are
+  shown once. The platform never sends messages or looks anyone up.
 - The hash-chained ledger and a **Verify ledger integrity** button, for auditors and judicial authorities.
 
 ## Design decisions that follow the product rules

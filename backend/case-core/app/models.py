@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from sqlalchemy import JSON, Boolean, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -21,6 +23,7 @@ class Case(Base):
     stage: Mapped[str] = mapped_column(String(24), default="received")
     signals: Mapped[list] = mapped_column(JSON, default=list)
     behaviors: Mapped[list] = mapped_column(JSON, default=list)
+    scenario: Mapped[str] = mapped_column(String(48), default="other")
     situation: Mapped[list] = mapped_column(JSON, default=list)
     # The flag attaches to a specific piece of content (an opaque fingerprint from the AI service), never to a person.
     content_fingerprint: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
@@ -47,6 +50,32 @@ class Case(Base):
     updated_at: Mapped[str] = mapped_column(String(40))
 
     items: Mapped[list["CaseItem"]] = relationship(back_populates="case", order_by="CaseItem.id")
+    parties: Mapped[list["CaseParty"]] = relationship(back_populates="case", order_by="CaseParty.id")
+
+    # Not persisted: set only on the instance returned by the action that served notice, so the response token and
+    # notice text reach the officer once and are never readable again.
+    issued_response_token: ClassVar[str | None] = None
+    issued_notice_text: ClassVar[str | None] = None
+
+
+class CaseParty(Base):
+    """A pseudonymous party in a case. No names, phone numbers, emails or addresses are ever stored here."""
+
+    __tablename__ = "case_parties"
+    __table_args__ = (UniqueConstraint("case_id", "ref", "role", name="uq_party_ref_role"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id"))
+    ref: Mapped[str] = mapped_column(String(64))  # opaque reference from the platform feed, for example "acct:7f3a9c"
+    role: Mapped[str] = mapped_column(String(32))
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    proposed_by: Mapped[str] = mapped_column(String(64))
+    determination: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    determined_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    determined_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    determined_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+    case: Mapped[Case] = relationship(back_populates="parties")
 
 
 class CaseItem(Base):

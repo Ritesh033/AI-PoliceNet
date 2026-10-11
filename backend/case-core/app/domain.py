@@ -131,9 +131,60 @@ def decide_flag(behaviors: "set[str] | frozenset[str] | list[str]", situation: "
     return FlagDecision(False, "No actionable behaviour. Casual profanity, insults, criticism or false statements alone are not flagged.")
 
 
+# --- Who is the suspect ------------------------------------------------------------------------------------------
+# The platform looks for the person who committed the offence, not for whoever appears in or hosts a video.
+# A scenario says what kind of event the clip shows; each scenario fixes which party roles can ever be a subject.
+#   * Intimate imagery shared without consent: the people depicted are victims and are never subjects. The uploader,
+#     the sharer or the person who secretly recorded it can be.
+#   * A public indecent act (for example nudity at a live show or in a public place): the person performing the act is
+#     the subject. The person who recorded or uploaded it is not, unless that person did something else wrong, such as
+#     extortion or harassment, which is flagged separately.
+#   * Explicit content published by the people who made or share it: the person who published it can be a subject.
+# Parties are pseudonymous references from the platform feed. The AI proposes roles; only a human officer decides.
+SCENARIOS = frozenset(
+    {"other", "intimate_imagery_without_consent", "public_indecent_act", "explicit_content_published"}
+)
+PARTY_ROLES = frozenset(
+    {"depicted_person", "uploader", "sharer", "recorder", "performer_in_public_act", "viewer_or_commenter"}
+)
+DETERMINATIONS = frozenset({"subject", "victim", "witness", "not_involved"})
+SUBJECT_CAPABLE_ROLES: dict[str, frozenset[str]] = {
+    "intimate_imagery_without_consent": frozenset({"uploader", "sharer", "recorder"}),
+    "public_indecent_act": frozenset({"performer_in_public_act"}),
+    "explicit_content_published": frozenset({"uploader", "sharer"}),
+}
+# Behaviours that are the wrongdoing of whoever recorded or shared a clip, independent of what the clip shows.
+UPLOADER_SIDE_BEHAVIORS = frozenset({"extortion", "sexual_harassment", "targeted_hate", "incitement_to_violence", "child_involved"})
+
+
+def explain_subject_rule(scenario: str, role: str, behaviors: "set[str] | list[str]") -> str | None:
+    """None when this role can be a subject in this scenario; otherwise the reason it cannot."""
+    capable = SUBJECT_CAPABLE_ROLES.get(scenario)
+    if capable is None:
+        return None  # no scenario rule: a human decides on the facts
+    if role in capable:
+        return None
+    if scenario == "public_indecent_act" and role in {"uploader", "sharer", "recorder"} and set(behaviors) & UPLOADER_SIDE_BEHAVIORS:
+        return None  # separate wrongdoing by the uploader, flagged on its own behaviours
+    if role == "depicted_person" and scenario in ("intimate_imagery_without_consent", "explicit_content_published"):
+        return (
+            "The person depicted is a victim in this kind of case and is never a subject. "
+            f"Subjects can be: {sorted(capable)}. If this person also published the material, record that as a separate 'uploader' role."
+        )
+    if scenario == "public_indecent_act":
+        return (
+            "In a public indecent act the subject is the person performing it, not the person who recorded or shared it. "
+            "An uploader or recorder becomes a subject only for separate wrongdoing such as extortion or harassment, which must be flagged as its own behaviour."
+        )
+    return f"In '{scenario}' cases subjects can only be: {sorted(capable)}"
+
+
 # Context the AI must have examined before any human can refer a social-media case: is the clip from a film, show
 # or skit; has it been edited or cut; what is the full original; where else does it appear.
 REQUIRED_CONTEXT_FINDINGS = frozenset({"media_source", "edit_detection", "full_context", "cross_platform_copies"})
+# Recorded by the AI when material is uploaded in response to a notice: does it match the flagged clip, is it the full
+# original. Informs humans; never part of the referral gate.
+OPTIONAL_FINDINGS = frozenset({"response_match"})
 FINDING_OUTCOMES = frozenset({"supports_flag", "undermines_flag", "inconclusive"})
 CONTEXT_GATED_ACTIONS = frozenset({"refer", "register_fir"})
 
@@ -206,6 +257,15 @@ ACTIONS: dict[str, ActionSpec] = {
     "serve_notice": _spec({_R.AUTHORIZED_OFFICER}, {_S.FIR_REGISTERED}, None, False),
     "court_proceed": _spec({_R.JUDICIAL_AUTHORITY}, {_S.FIR_REGISTERED}, None, True),
     "court_close": _spec({_R.JUDICIAL_AUTHORITY}, {_S.FIR_REGISTERED}, _S.CLOSED_BY_COURT, True),
+    # Only a human officer decides who is a subject, a victim or a witness, within the scenario rules above.
+    "determine_party": _spec(
+        {_R.AUTHORIZED_OFFICER}, {_S.REFERRED, _S.INQUIRY, _S.FIR_REGISTERED}, None, True
+    ),
+    # Identifying a person behind an account is a legal-process step by an officer, recorded here with its legal basis.
+    # The platform itself never looks up, stores or messages anyone's contact details.
+    "request_identification": _spec(
+        {_R.AUTHORIZED_OFFICER}, {_S.REFERRED, _S.INQUIRY, _S.FIR_REGISTERED}, None, True
+    ),
     # New information about the same clip or issue is added to the existing case; it never opens a second FIR.
     "link_supplementary": _spec({_R.REVIEWER}, {_S.RECEIVED, _S.IN_REVIEW}, _S.LINKED, True),
     # A court may allow a fresh registration on the same clip (for example when the full original surfaces later).
@@ -225,7 +285,13 @@ ACTIONS: dict[str, ActionSpec] = {
 }
 
 # Extra inputs an action needs besides the written note. Exposed so a client can render the right form.
-ACTION_PARAMS: dict[str, list[str]] = {"record_check": ["check"], "link_supplementary": ["link_to"]}
+ACTION_PARAMS: dict[str, list[str]] = {
+    "record_check": ["check"],
+    "link_supplementary": ["link_to"],
+    "determine_party": ["party_ref", "party_role", "determination"],
+    "request_identification": ["party_ref", "legal_basis"],
+    "serve_notice": ["party_ref"],
+}
 
 # Who handles a referred case, by case kind. Conduct complaints never go to the force being complained about.
 REFERRAL_TARGET: dict[CaseKind, Role] = {

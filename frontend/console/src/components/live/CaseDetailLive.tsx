@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, type ApiClient } from '../../api/client';
-import type { ActionMeta, ApiCase, ApiItem, ApiRole, LedgerRow, VerifyResult } from '../../api/types';
+import type { ActionMeta, ApiCase, ApiItem, ApiParty, ApiRole, LedgerRow, VerifyResult } from '../../api/types';
 import { API_ROLES } from '../../api/types';
 import { dueLabel, fmtDateTime } from '../../lib/format';
 import { Card } from '../Card';
 import { Icon } from '../Icon';
 import { PriorityBadge } from '../Badges';
-import { ACTION_LABEL, API_STAGE_LABEL, BEHAVIOR_LABEL, CONTEXT_KEYS, OUTCOME_LABEL } from './labels';
+import {
+  ACTION_LABEL, API_STAGE_LABEL, BEHAVIOR_LABEL, CONTEXT_KEYS, DETERMINATION_LABEL, OUTCOME_LABEL, PARTY_ROLE_LABEL,
+  SCENARIO_LABEL, SCENARIO_RULE,
+} from './labels';
 
 interface Props {
   item: ApiCase;
@@ -85,6 +88,8 @@ export function CaseDetailLive({ item, meta, role, client, now, onChanged }: Pro
 
       {item.kind === 'social' && <ContextChecklist item={item} findings={findings} />}
 
+      {(item.parties?.length ?? 0) > 0 && <WhoIsWho item={item} />}
+
       {evidence.length > 0 && (
         <>
           <h3 className="mt-4 text-sm font-semibold text-ink">Evidence (hash only)</h3>
@@ -131,6 +136,39 @@ export function CaseDetailLive({ item, meta, role, client, now, onChanged }: Pro
   );
 }
 
+function WhoIsWho({ item }: { item: ApiCase }) {
+  const parties = item.parties ?? [];
+  return (
+    <>
+      <h3 className="mt-4 text-sm font-semibold text-ink">Who is who (proposed by the AI, decided by an officer)</h3>
+      {SCENARIO_RULE[item.scenario] && (
+        <p className="mt-1 text-xs leading-5 text-ink-2">
+          <span className="font-medium text-ink">{SCENARIO_LABEL[item.scenario]}.</span> {SCENARIO_RULE[item.scenario]}
+        </p>
+      )}
+      <ul className="mt-1.5 space-y-1.5 text-sm" aria-label="Parties">
+        {parties.map((p: ApiParty) => (
+          <li key={`${p.ref}-${p.role}`} className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-mono text-xs text-ink-2">{p.ref}</span>
+            <span className="text-ink">{PARTY_ROLE_LABEL[p.role] ?? p.role}</span>
+            <span
+              className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
+                p.determination === 'subject'
+                  ? 'border-crit/40 bg-crit-soft text-ink'
+                  : p.determination === 'victim'
+                    ? 'border-accent/30 bg-accent-soft text-accent-text'
+                    : 'border-line bg-surface-2 text-ink-2'
+              }`}
+            >
+              {p.determination ? DETERMINATION_LABEL[p.determination] : 'Not yet decided'}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 function ContextChecklist({ item, findings }: { item: ApiCase; findings: ApiItem[] }) {
   const latest = (key: string) => [...findings].reverse().find((f) => f.label === key);
   const acknowledged = item.checks.includes('context');
@@ -172,6 +210,11 @@ function ActionPanel({ item, meta, role, client, onChanged }: Omit<Props, 'now'>
   const [note, setNote] = useState('');
   const [check, setCheck] = useState('');
   const [linkTo, setLinkTo] = useState('');
+  const [partyRef, setPartyRef] = useState('');
+  const [partyRole, setPartyRole] = useState('');
+  const [determination, setDetermination] = useState('');
+  const [legalBasis, setLegalBasis] = useState('');
+  const [pkg, setPkg] = useState<{ link: string; text: string } | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -182,6 +225,11 @@ function ActionPanel({ item, meta, role, client, onChanged }: Omit<Props, 'now'>
     setNote('');
     setCheck('');
     setLinkTo('');
+    setPartyRef('');
+    setPartyRole('');
+    setDetermination('');
+    setLegalBasis('');
+    setPkg(null);
     setError(null);
     setMessage('');
   }, [item.id]);
@@ -197,12 +245,20 @@ function ActionPanel({ item, meta, role, client, onChanged }: Omit<Props, 'now'>
     setError(null);
     setMessage('');
     try {
-      await client.act(item.id, {
+      const has = (name: string) => spec.params.includes(name);
+      const updated = await client.act(item.id, {
         action: selected,
         note: note || undefined,
-        check: spec.params.includes('check') ? check || undefined : undefined,
-        link_to: spec.params.includes('link_to') ? linkTo || undefined : undefined,
+        check: has('check') ? check || undefined : undefined,
+        link_to: has('link_to') ? linkTo || undefined : undefined,
+        party_ref: has('party_ref') ? partyRef || undefined : undefined,
+        party_role: has('party_role') ? partyRole || undefined : undefined,
+        determination: has('determination') ? determination || undefined : undefined,
+        legal_basis: has('legal_basis') ? legalBasis || undefined : undefined,
       });
+      if (updated.issued_response_token && updated.issued_notice_text) {
+        setPkg({ link: `/public/responses/${updated.issued_response_token}`, text: updated.issued_notice_text });
+      }
       setMessage(`${ACTION_LABEL[selected] ?? selected}: recorded in the ledger.`);
       setNote('');
       setSelected(null);
@@ -274,6 +330,73 @@ function ActionPanel({ item, meta, role, client, onChanged }: Omit<Props, 'now'>
                   </select>
                 </label>
               )}
+              {spec.params.includes('party_ref') && (item.parties?.length ?? 0) > 0 && (
+                <label className="block text-sm text-ink-2">
+                  Party
+                  <select
+                    value={partyRef}
+                    onChange={(e) => {
+                      setPartyRef(e.target.value);
+                      setPartyRole('');
+                    }}
+                    className="mt-1 block min-h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+                  >
+                    <option value="">Choose a party</option>
+                    {[...new Set((item.parties ?? []).map((p) => p.ref))].map((ref) => (
+                      <option key={ref} value={ref}>
+                        {ref}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {spec.params.includes('party_role') && (
+                <label className="block text-sm text-ink-2">
+                  Role being decided
+                  <select
+                    value={partyRole}
+                    onChange={(e) => setPartyRole(e.target.value)}
+                    className="mt-1 block min-h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+                  >
+                    <option value="">Choose a role</option>
+                    {(item.parties ?? [])
+                      .filter((p) => p.ref === partyRef)
+                      .map((p) => (
+                        <option key={p.role} value={p.role}>
+                          {PARTY_ROLE_LABEL[p.role] ?? p.role}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
+              {spec.params.includes('determination') && (
+                <label className="block text-sm text-ink-2">
+                  Decision
+                  <select
+                    value={determination}
+                    onChange={(e) => setDetermination(e.target.value)}
+                    className="mt-1 block min-h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+                  >
+                    <option value="">Choose</option>
+                    {Object.entries(DETERMINATION_LABEL).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {spec.params.includes('legal_basis') && (
+                <label className="block text-sm text-ink-2">
+                  Legal basis <span className="text-ink">(required)</span>
+                  <input
+                    value={legalBasis}
+                    onChange={(e) => setLegalBasis(e.target.value)}
+                    placeholder="Notice or order reference"
+                    className="mt-1 block min-h-9 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink"
+                  />
+                </label>
+              )}
               {spec.params.includes('link_to') && (
                 <label className="block text-sm text-ink-2">
                   Existing case to add this information to
@@ -305,6 +428,23 @@ function ActionPanel({ item, meta, role, client, onChanged }: Omit<Props, 'now'>
             </form>
           )}
         </>
+      )}
+      {pkg && (
+        <div className="mt-3 rounded-lg border border-accent/30 bg-accent-soft p-3">
+          <p className="text-sm font-semibold text-ink">Notice package (shown once)</p>
+          <p className="mt-1 text-xs leading-5 text-ink-2">
+            This platform never sends messages or looks anyone up. Deliver this notice through a lawful channel and record that you
+            did. The private response link works for anyone who holds it, with no login. It is not stored and cannot be shown again.
+          </p>
+          <p className="mt-2 break-all font-mono text-xs text-ink">{pkg.link}</p>
+          <pre
+            tabIndex={0}
+            aria-label="Notice text"
+            className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded bg-surface p-2 text-xs leading-5 text-ink"
+          >
+            {pkg.text}
+          </pre>
+        </div>
       )}
       {error && (
         <p role="alert" className="mt-3 flex gap-2 rounded-lg border border-crit/40 bg-crit-soft p-2.5 text-sm text-ink">

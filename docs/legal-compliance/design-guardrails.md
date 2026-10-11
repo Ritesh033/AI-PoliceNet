@@ -34,6 +34,38 @@ partial, what the full original shows, and where else the clip appears. Only cop
 gathered from public or authorized sources; requests to a platform for user data are made by an authorized officer
 through legal process.
 
+## Who is the suspect: the person who did it, not whoever appears in or hosts the video
+
+Each flagged case can carry a scenario, and the scenario fixes which party roles can ever be a subject. Parties are
+pseudonymous references from the platform feed. The AI proposes roles; only an authorized officer decides.
+
+- **Intimate imagery shared without consent** (for example a private video of two adults posted by someone else): the
+  people shown are victims and are never subjects. The uploader, a sharer or the person who secretly recorded it can be.
+- **A public indecent act** (for example nudity at a live show or in a public place): the person performing it is the
+  subject. The person who filmed it or posted it is not, unless they did something else wrong, such as extortion or
+  harassment, which is flagged on its own behaviour.
+- **Explicit content published by those who made or share it:** the person who published it can be a subject. Someone
+  who also appears in it is judged separately in each role.
+- An FIR in these cases cannot be registered until an officer has decided who is a subject, a victim or a witness.
+
+## Notices and identification
+
+- The platform never looks up, stores or messages anyone's name, phone number, email or WhatsApp number. The schema has
+  no place for them, and the service imports no outbound-network library (both are tests).
+- Identifying a person behind an account is a legal-process step by an authorized officer (for example a lawful request
+  to the platform), recorded in the ledger with its legal basis. It is refused for victims, witnesses and uninvolved
+  people.
+- A notice goes only to a party an officer has determined to be a subject, never to a victim. It is plain language and
+  says why the clip was flagged, what was checked, that an officer and not a machine decided, that an FIR is not a
+  finding of guilt, how to respond, that nothing happens automatically if time passes, and that the system never asks
+  for money, OTPs or documents. An officer delivers it through a lawful channel and records that they did.
+- Responding needs no login. A private link in the notice is the only credential: anyone holding it can upload the full
+  original video or any other material from any account or device without saying who they are. The AI matches uploads
+  to the flagged clip and can recommend dismissal; a human reads every response and only a court can close an FIR.
+- Staff do need to be identified, because every decision must be attributable to an accountable person. A system with no
+  staff identity could not tell who registered an FIR.
+- Government employees get exactly the same notice, response and review rights as anyone else.
+
 ## Must hold (enforced and tested in `backend/case-core`)
 
 - AI never registers, cancels or closes an FIR, issues an order, or arrests anyone.
@@ -68,6 +100,9 @@ through legal process.
 | City-camera sweeps on individuals to check whether they were "followed" | Surveillance of a person needs a legal basis, necessity and proportionality. Duress is handled by a human wellbeing contact. |
 | Robots with arrest or custody powers | Those powers belong to accountable human officers. Robots may do administrative intake. |
 | Different processes for leaders and ordinary citizens | Equality before law. |
+| A system installed across all platforms that collects everything about suspects | Platforms do not allow it, and mass collection is surveillance. Data comes through authorized channels and public sources, and requests for user data go through legal process by an officer. |
+| AI automatically finding a person's WhatsApp number, phone or email and messaging them | Automated identification and contact-harvesting of private people, with no legal process. A wrong match would accuse an innocent person, and an automated message can look like a scam. |
+| Treating the person shown in a private video, or the person who filmed or posted a public act, as the suspect by default | The suspect is the person who committed the offence. See the scenario rules above. |
 | Claims that data "cannot be changed or hacked by anyone" | Not achievable. The goal is tamper-evidence with independent checkpoints, and visible court-ordered corrections. |
 
 ## Open items for legal review

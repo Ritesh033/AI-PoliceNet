@@ -129,7 +129,45 @@ def seed(session: Session, clock: Callable[[], datetime] = utcnow) -> list[str]:
         rationale="Continuing research found the original context; the court should review.",
     )
 
-    # 8. An alert dropped by policy: casual profanity between friends. Recorded without any person.
+    def refer(case: Case) -> None:
+        for key in ("media_source", "edit_detection", "full_context", "cross_platform_copies"):
+            finding(case, key, "supports_flag", f"{key} examined")
+        svc.act(REVIEWER, case.id, "assign")
+        svc.act(REVIEWER, case.id, "record_check", check="context")
+        svc.act(REVIEWER, case.id, "refer", note="Context reviewed; referring for an authorized decision")
+
+    # 8. Intimate imagery shared without consent. The people in the video are victims; the uploader is the candidate
+    #    subject. Parties are pseudonymous references. An officer decides; the rules refuse naming a victim a subject.
+    intimate = alert(
+        category=Category.NCII, title="Private video shared without consent", confidence=0.93, priority="high",
+        summary="A private video of two adults was posted publicly by an account that is not either of them.",
+        content_fingerprint="fp-demo-0009", behaviors=["non_consensual_imagery"],
+        scenario="intimate_imagery_without_consent",
+        evidence=[{"label": "clip (sample)", "sha256": digest("private-video")}],
+    )
+    svc.propose_parties(AI, intimate.id, [
+        {"ref": "acct:person-a", "role": "depicted_person", "rationale": "appears in the video"},
+        {"ref": "acct:person-b", "role": "depicted_person", "rationale": "appears in the video"},
+        {"ref": "acct:poster-7", "role": "uploader", "rationale": "first account to post it; not in the video"},
+    ])
+    refer(intimate)
+
+    # 9. A public indecent act at a live event. The person performing it is the candidate subject; the person who
+    #    filmed and the account that posted it are not, unless they did something else wrong.
+    public_act = alert(
+        category=Category.NCII, title="Nudity during a live public event", confidence=0.88,
+        summary="A bystander's recording shows a person performing a nude act in a public place during a live show.",
+        content_fingerprint="fp-demo-0010", behaviors=["sexual_content"], scenario="public_indecent_act",
+        evidence=[{"label": "clip (sample)", "sha256": digest("public-act")}],
+    )
+    svc.propose_parties(AI, public_act.id, [
+        {"ref": "acct:performer-3", "role": "performer_in_public_act", "rationale": "performs the act in the clip"},
+        {"ref": "acct:bystander-5", "role": "recorder", "rationale": "filmed it from the audience"},
+        {"ref": "acct:poster-8", "role": "uploader", "rationale": "reposted the clip"},
+    ])
+    refer(public_act)
+
+    # 10. An alert dropped by policy: casual profanity between friends. Recorded without any person.
     svc.create_alert(
         AI, category=Category.HATE, title="Friends joking", summary="Banter", confidence=0.5,
         content_fingerprint="fp-demo-0008", behaviors=["casual_profanity"], situation=["friendly_banter"],

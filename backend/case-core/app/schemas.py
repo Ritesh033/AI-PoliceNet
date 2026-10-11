@@ -20,6 +20,8 @@ class AlertIn(BaseModel):
     behaviors: list[str]
     # The situation the model judged: banter, political commentary, repeated targeting, and so on. Closed vocabulary.
     situation: list[str] = []
+    # What kind of event the clip shows. Fixes which party roles can ever be a subject (see domain.explain_subject_rule).
+    scenario: str = "other"
     priority: str = "routine"
     signals: list[str] = []
     evidence: list[EvidenceIn] = []
@@ -38,6 +40,10 @@ class ActionIn(BaseModel):
     note: str | None = None
     check: str | None = None
     link_to: str | None = None
+    party_ref: str | None = None
+    party_role: str | None = None
+    determination: str | None = None
+    legal_basis: str | None = None
 
 
 class AdvisoryIn(BaseModel):
@@ -56,4 +62,20 @@ class ContextFindingIn(BaseModel):
 class ResponseIn(BaseModel):
     label: str = Field(max_length=200)
     description: str = ""
+    sha256: str | None = None
+
+
+class PartyProposalIn(BaseModel):
+    ref: str = Field(max_length=64)  # opaque account reference, never an email address or phone number
+    role: str
+    rationale: str = ""
+
+
+class PartiesIn(BaseModel):
+    proposals: list[PartyProposalIn]
+
+
+class PublicResponseIn(BaseModel):
+    label: str = Field(max_length=200)
+    description: str = Field(default="", max_length=2000)
     sha256: str | None = None

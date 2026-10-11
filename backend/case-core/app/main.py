@@ -10,8 +10,8 @@ from .config import get_settings
 from .db import init_db, make_engine, make_session_factory
 from .domain import ACTION_PARAMS, ACTIONS, KNOWN_CHECKS, Actor, PolicyViolation, Role
 from .ledger import Ledger
-from .models import Case, CaseItem, LedgerEntry
-from .schemas import ActionIn, AdvisoryIn, AlertIn, ComplaintIn, ContextFindingIn, ResponseIn
+from .models import Case, CaseItem, CaseParty, LedgerEntry
+from .schemas import ActionIn, AdvisoryIn, AlertIn, ComplaintIn, ContextFindingIn, PartiesIn, PublicResponseIn, ResponseIn
 from .service import CaseService
 
 
@@ -79,12 +79,19 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
             "added_by": i.added_by, "added_at": i.added_at,
         }
 
+    def party_out(p: CaseParty) -> dict:
+        return {
+            "ref": p.ref, "role": p.role, "rationale": p.rationale, "proposed_by": p.proposed_by,
+            "determination": p.determination, "determined_note": p.determined_note,
+        }
+
     def case_out(c: Case, actor: Actor) -> dict:
         findings = [i for i in c.items if i.kind == "context_finding"]
         out = {
             "id": c.id, "kind": c.kind, "category": c.category, "title": c.title, "summary": c.summary,
             "priority": c.priority, "confidence": c.confidence, "stage": c.stage, "signals": c.signals,
-            "behaviors": c.behaviors, "situation": c.situation, "content_fingerprint": c.content_fingerprint,
+            "behaviors": c.behaviors, "situation": c.situation, "scenario": c.scenario,
+            "parties": [party_out(p) for p in c.parties], "content_fingerprint": c.content_fingerprint,
             "checks": c.checks, "referred_to_role": c.referred_to_role, "notice_served_at": c.notice_served_at,
             "window_closes_at": c.window_closes_at, "response_received": c.response_received,
             "court_reviewed": c.court_reviewed, "appeal_open": c.appeal_open,
@@ -100,6 +107,12 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
         }
         if not actor.is_staff:
             out.pop("signals", None)  # internal model signals are for reviewers
+            out.pop("parties", None)  # who is a victim or subject is for officers, never shown to the public
+        # Only on the response to the action that served notice: the officer receives the full notice and the private
+        # response link once. They are not stored and cannot be read again.
+        if c.issued_response_token:
+            out["issued_response_token"] = c.issued_response_token
+            out["issued_notice_text"] = c.issued_notice_text
         return out
 
     def ledger_out(e: LedgerEntry) -> dict:
@@ -159,7 +172,25 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
 
     @app.post("/cases/{case_id}/actions")
     def act(case_id: str, body: ActionIn, actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)) -> dict:
-        return case_out(svc.act(actor, case_id, body.action, body.note, body.check, body.link_to), actor)
+        extras = {k: getattr(body, k) for k in ("party_ref", "party_role", "determination", "legal_basis") if getattr(body, k)}
+        return case_out(svc.act(actor, case_id, body.action, body.note, body.check, body.link_to, **extras), actor)
+
+    @app.post("/cases/{case_id}/parties", status_code=201)
+    def propose_parties(
+        case_id: str, body: PartiesIn, actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)
+    ) -> dict:
+        created = svc.propose_parties(actor, case_id, [p.model_dump() for p in body.proposals])
+        return {"created": [party_out(p) for p in created], "note": "Proposals only. An authorized officer decides who is a subject, victim or witness."}
+
+    @app.post("/public/responses/{token}", status_code=201)
+    def public_response(token: str, body: PublicResponseIn, svc: CaseService = Depends(service)) -> dict:
+        """No login. The private response link in a notice is the only credential, and the responder never has to say who
+        they are. They can upload the full original video or any other material from any account or device."""
+        item = svc.submit_response_by_token(token, **body.model_dump())
+        return {
+            "received": True, "receipt": item.id, "late": item.late,
+            "next": "A human reviewer will read this. Nothing happens to you automatically, and a court can review the case.",
+        }
 
     @app.post("/cases/{case_id}/context-findings", status_code=201)
     def context_finding(

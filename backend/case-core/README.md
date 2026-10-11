@@ -12,8 +12,8 @@ and a **tamper-evident ledger** that records every step.
 cd backend/case-core
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
-python -m pytest -q                                   # 122 tests
-APN_ENV=demo APN_CHECKPOINT_KEY=change-me python -m app.demo_seed      # optional: 7 invented sample cases
+python -m pytest -q                                   # 151 tests
+APN_ENV=demo APN_CHECKPOINT_KEY=change-me python -m app.demo_seed      # optional: 9 invented sample cases
 APN_ENV=demo APN_CHECKPOINT_KEY=change-me APN_CORS_ORIGINS=http://localhost:3100 uvicorn app.main:app --port 8100
 # interactive docs: http://localhost:8100/docs
 ```
@@ -36,9 +36,11 @@ received -> in_review -> referred -> inquiry -> fir_registered -> closed_by_cour
 | Endpoint | Who | What |
 | --- | --- | --- |
 | `POST /alerts` | AI service | Submit what the model saw (`behaviors`, `situation`, a clip `content_fingerprint`). Returns `outcome`: `flagged` (201, temporary flag on the clip), `no_flag` (200, dropped by policy, recorded without any person) or `duplicate` (200, attached to the case already tracking that clip). Evidence is a hash plus label; media is never stored. |
+| `POST /cases/{id}/parties` | AI service | Propose who appears in a case and in what role, using pseudonymous references only (never an email or phone number). Proposals decide nothing. |
+| `POST /public/responses/{token}` | Anyone holding the case's private link (no login) | Upload the full original video or any other material from any account. A human reads it. Also works when staff auth is not configured. |
 | `POST /cases/{id}/context-findings` | AI service | Full-context research: `media_source` (film, show, skit), `edit_detection`, `full_context`, `cross_platform_copies`. Referral is blocked until all four exist and a human records `record_check: context`. |
 | `POST /complaints` | Citizen | File a conduct complaint naming the official or office. |
-| `POST /cases/{id}/actions` | Humans, by role | `assign`, `record_check`, `request_context`, `no_action`, `refer`, `open_inquiry`, `decline`, `register_fir`, `serve_notice`, `court_proceed`, `court_close`, `permit_fresh_registration`, `link_supplementary`, `appeal`, `resolve_appeal` |
+| `POST /cases/{id}/actions` | Humans, by role | `assign`, `record_check`, `request_context`, `no_action`, `refer`, `open_inquiry`, `decline`, `register_fir`, `serve_notice`, `determine_party`, `request_identification`, `court_proceed`, `court_close`, `permit_fresh_registration`, `link_supplementary`, `appeal`, `resolve_appeal` |
 | `POST /cases/{id}/advisory` | AI service | Attach a recommendation (`kind`: `info` or `dismissal`). Recorded as non-binding; never moves a case. A `dismissal` advisory puts an FIR in the court's queue. |
 | `POST /cases/{id}/responses` | A party | Submit counter-material. Always accepted while the matter is open; late ones are marked late. |
 | `GET /attention/window-elapsed` | Staff | Cases whose response window passed. Asks a human to follow up; changes nothing. |
@@ -69,6 +71,12 @@ received -> in_review -> referred -> inquiry -> fir_registered -> closed_by_cour
 | One FIR per clip; repeats and related clips add information to the existing case; a court can permit a fresh registration | `service.create_alert`, `service._authorize` | `test_a_repeat_alert_on_the_same_clip_adds_information_and_never_opens_a_second_case`, `test_an_fir_cannot_be_registered_twice_on_the_same_clip_even_by_a_path_that_skips_dedupe`, `test_a_court_can_permit_a_fresh_registration_so_the_rule_is_not_a_trap` |
 | A missed 24-hour deadline escalates to a supervisor and files nothing | `service.sweep_deadlines` | `test_a_missed_deadline_escalates_to_a_supervisor_and_files_nothing` |
 | AI dismissal recommendations reach the court queue and cancel nothing | `service.add_advisory` | `test_an_ai_dismissal_recommendation_reaches_the_court_queue_but_cancels_nothing` |
+| The victim is never the suspect: people shown in intimate imagery shared without consent cannot be named subjects; in a public indecent act the performer, not the person who filmed or posted it, is the subject | `domain.explain_subject_rule` | `test_people_depicted_in_intimate_imagery_shared_without_consent_are_never_subjects`, `test_two_adults_in_a_private_video_are_victims_of_the_person_who_leaked_it`, `test_in_a_public_indecent_act_the_performer_is_the_subject_not_whoever_recorded_or_posted_it` |
+| Only an officer decides who is a subject; the AI only proposes; an FIR in these cases needs the parties decided first | `service._authorize_determination` | `test_only_an_authorized_officer_determines_parties_and_only_among_proposed_parties`, `test_an_fir_in_a_scenario_case_needs_the_parties_decided_first` |
+| A notice goes only to a determined subject, never to a victim; its text explains why and how to respond | `service._authorize_notice`, `notice.build_notice` | `test_a_notice_goes_only_to_a_determined_subject_never_to_a_victim`, `test_the_notice_explains_why_what_it_means_and_how_to_respond_without_logging_in` |
+| Respond with no login via a private link; the link is shown once and only its hash is stored | `service.submit_response_by_token` | `test_anyone_holding_the_link_can_respond_from_any_account_without_identifying_themselves`, `test_the_response_link_is_shown_once_and_only_its_hash_is_stored` |
+| Identification is a recorded officer step with a legal basis, never for a victim | `service._authorize_identification` | `test_identification_is_a_recorded_officer_step_with_a_legal_basis_and_never_for_a_victim` |
+| No place to store a name, phone, email or address, and nothing is ever sent | `models`, whole `app/` package | `test_the_schema_has_no_place_to_store_a_name_phone_number_email_or_address`, `test_the_service_never_sends_anything_or_calls_out` |
 | Sensitive media is hash-only and marked preview-withheld | `service._new_case` | `test_sensitive_evidence_stores_hash_only_and_marks_preview_withheld` |
 
 ## The ledger: tamper-evident, not tamper-proof
@@ -83,6 +91,8 @@ signed `/ledger/checkpoint` to independent custodians (for example a court regis
 civil-society archive). Corrections are new entries that reference the old ones; nothing is silently erased.
 
 ## Not built yet
+
+- A public web page for the response link (today the link is an API path); translations of the notice.
 
 - Real authentication: OIDC, MFA, role assignment and revocation.
 - PostgreSQL deployment, including append-only triggers (SQLite triggers exist and are tested).

@@ -18,7 +18,7 @@ from .conftest import AUDITOR, CITIZEN, REVIEWER, headers
 
 def test_seed_builds_every_guardrail_scenario_and_the_ledger_verifies(session, clock):
     ids = seed(session, clock)
-    assert len(ids) == 7
+    assert len(ids) == 9
     cases = {c.id: c for c in session.query(Case)}
     stages = {c.title: c.stage for c in cases.values()}
     assert stages["Reported threat of violence in a public video"] == "received"
@@ -26,6 +26,11 @@ def test_seed_builds_every_guardrail_scenario_and_the_ledger_verifies(session, c
     assert any(c.dismissal_recommended for c in cases.values())
     ncii = next(c for c in cases.values() if c.category == "ncii")
     assert ncii.items[0].preview_withheld and ncii.items[0].sha256
+    # The two scenario cases arrive at the officer with parties proposed and none decided.
+    scenarios = {c.scenario: c for c in cases.values() if c.scenario != "other"}
+    assert set(scenarios) == {"intimate_imagery_without_consent", "public_indecent_act"}
+    for c in scenarios.values():
+        assert c.stage == "referred" and len(c.parties) == 3 and all(p.determination is None for p in c.parties)
     assert sum(1 for e in Ledger(session).entries(limit=500) if e.action == "triage.no_flag") == 1
     svc = CaseService(session, clock)
     assert Ledger(session).verify().ok and svc.verify_projection() == []

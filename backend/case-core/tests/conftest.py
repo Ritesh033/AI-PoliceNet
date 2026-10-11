@@ -67,7 +67,8 @@ def clock() -> Clock:
 def engine():
     eng = make_engine("sqlite://")
     init_db(eng)
-    return eng
+    yield eng
+    eng.dispose()
 
 
 @pytest.fixture

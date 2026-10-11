@@ -21,7 +21,7 @@ export type ApiStage =
 
 export interface ApiItem {
   id: number;
-  kind: 'evidence' | 'response' | 'advisory' | 'context_finding';
+  kind: 'evidence' | 'response' | 'advisory' | 'context_finding' | 'notice';
   label: string;
   outcome: 'supports_flag' | 'undermines_flag' | 'inconclusive' | null;
   description: string;
@@ -30,6 +30,15 @@ export interface ApiItem {
   late: boolean;
   added_by: string;
   added_at: string;
+}
+
+export interface ApiParty {
+  ref: string;
+  role: string;
+  rationale: string;
+  proposed_by: string;
+  determination: 'subject' | 'victim' | 'witness' | 'not_involved' | null;
+  determined_note: string | null;
 }
 
 export interface ApiCase {
@@ -44,6 +53,8 @@ export interface ApiCase {
   signals?: string[];
   behaviors: string[];
   situation: string[];
+  scenario: string;
+  parties?: ApiParty[];
   content_fingerprint: string | null;
   checks: string[];
   referred_to_role: string | null;
@@ -63,6 +74,9 @@ export interface ApiCase {
   updated_at: string;
   items: ApiItem[];
   ai_notice: string;
+  /** Present only on the response to the action that served notice. Shown once, never stored. */
+  issued_response_token?: string;
+  issued_notice_text?: string;
 }
 
 export interface ActionSpec {
@@ -104,4 +118,8 @@ export interface ActionRequest {
   note?: string;
   check?: string;
   link_to?: string;
+  party_ref?: string;
+  party_role?: string;
+  determination?: string;
+  legal_basis?: string;
 }

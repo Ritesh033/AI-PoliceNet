@@ -10,7 +10,7 @@ function makeCase(over: Partial<ApiCase>): ApiCase {
   return {
     id: 'APN-1001', kind: 'social', category: 'threat', title: 'Reported threat in a public video',
     summary: 'Spoken statements appear to threaten violence.', priority: 'urgent', confidence: 0.87, stage: 'received',
-    behaviors: ['threat'], situation: [], content_fingerprint: 'fp-demo-0001', checks: [], referred_to_role: null,
+    behaviors: ['threat'], situation: [], scenario: 'other', content_fingerprint: 'fp-demo-0001', checks: [], referred_to_role: null,
     notice_served_at: null, window_closes_at: null, response_received: false, court_reviewed: false, appeal_open: false,
     decision_due_at: new Date(NOW + 3 * 3600_000).toISOString(), sla_breached: false, linked_to: null,
     dismissal_recommended: false, fresh_registration_permitted: false,
@@ -31,6 +31,8 @@ const META = {
     assign: { roles: ['reviewer'], from_stages: ['received'], to_stage: 'in_review', note_required: false, params: [] },
     no_action: { roles: ['reviewer'], from_stages: ['received', 'in_review'], to_stage: 'closed_no_action', note_required: true, params: [] },
     record_check: { roles: ['reviewer'], from_stages: ['received', 'in_review'], to_stage: null, note_required: false, params: ['check'] },
+    determine_party: { roles: ['authorized_officer'], from_stages: ['referred', 'inquiry', 'fir_registered'], to_stage: null, note_required: true, params: ['party_ref', 'party_role', 'determination'] },
+    serve_notice: { roles: ['authorized_officer'], from_stages: ['fir_registered'], to_stage: null, note_required: false, params: ['party_ref'] },
     court_close: { roles: ['judicial_authority'], from_stages: ['fir_registered'], to_stage: 'closed_by_court', note_required: true, params: [] },
     appeal: { roles: ['citizen'], from_stages: ['fir_registered'], to_stage: null, note_required: true, params: [] },
   },
@@ -174,5 +176,79 @@ describe('LiveCases', () => {
     await user.click(screen.getByRole('button', { name: 'Connect' }));
     expect(screen.getByRole('alert')).toHaveTextContent(/valid http/i);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('shows who is who, lets an officer decide, and the server refuses to name a victim a subject', async () => {
+    const intimate = makeCase({
+      id: 'APN-1008', stage: 'referred', category: 'ncii', scenario: 'intimate_imagery_without_consent',
+      behaviors: ['non_consensual_imagery'], context_missing: [],
+      parties: [
+        { ref: 'acct:person-a', role: 'depicted_person', rationale: 'appears in the video', proposed_by: 'model-v1', determination: null, determined_note: null },
+        { ref: 'acct:poster-7', role: 'uploader', rationale: 'first account to post it', proposed_by: 'model-v1', determination: null, determined_note: null },
+      ],
+    });
+    const calls = installFetch(({ url, method, body }) => {
+      if (url === '/health') return { status: 200, body: { status: 'ok', auth: 'demo-stub' } };
+      if (url === '/meta/actions') return { status: 200, body: META };
+      if (url === '/cases') return { status: 200, body: [intimate] };
+      if (url === '/cases/APN-1008/actions' && method === 'POST') {
+        const b = body as { determination?: string };
+        if (b.determination === 'subject' && (body as { party_role?: string }).party_role === 'depicted_person') {
+          return { status: 409, body: { error: 'not_a_subject_role', detail: 'The person depicted is a victim in this kind of case and is never a subject.' } };
+        }
+        return { status: 200, body: intimate };
+      }
+      return { status: 404, body: {} };
+    });
+    const user = userEvent.setup();
+    render(<LiveCases now={NOW} />);
+    await user.selectOptions(screen.getByLabelText('Act as'), 'authorized_officer');
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+    const detail = await screen.findByRole('region', { name: /APN-1008/ });
+    expect(detail).toHaveTextContent(/People shown in the video are victims, never suspects/);
+    const parties = within(detail).getByRole('list', { name: 'Parties' });
+    expect(within(parties).getAllByText('Not yet decided')).toHaveLength(2);
+
+    await user.click(within(detail).getByRole('button', { name: 'Decide who is who' }));
+    await user.selectOptions(within(detail).getByLabelText('Party'), 'acct:person-a');
+    await user.selectOptions(within(detail).getByLabelText('Role being decided'), 'depicted_person');
+    await user.selectOptions(within(detail).getByLabelText('Decision'), 'subject');
+    await user.type(within(detail).getByLabelText(/written reason/i), 'trying to name the person in the video');
+    await user.click(within(detail).getByRole('button', { name: /submit: decide who is who/i }));
+    const alert = await within(detail).findByRole('alert');
+    expect(alert).toHaveTextContent(/is a victim in this kind of case and is never a subject/);
+    expect(alert).toHaveTextContent('not_a_subject_role');
+    const post = calls.filter((c) => c.method === 'POST').at(-1)!;
+    expect(post.body).toMatchObject({ action: 'determine_party', party_ref: 'acct:person-a', party_role: 'depicted_person', determination: 'subject' });
+  });
+
+  it('shows the notice package exactly once and says the platform never sends messages', async () => {
+    const fir = makeCase({
+      id: 'APN-1009', stage: 'fir_registered', context_missing: [],
+      parties: [{ ref: 'acct:poster-7', role: 'uploader', rationale: '', proposed_by: 'model-v1', determination: 'subject', determined_note: 'posted it' }],
+    });
+    installFetch(({ url, method }) => {
+      if (url === '/health') return { status: 200, body: { status: 'ok', auth: 'demo-stub' } };
+      if (url === '/meta/actions') return { status: 200, body: META };
+      if (url === '/cases') return { status: 200, body: [fir] };
+      if (url === '/cases/APN-1009/actions' && method === 'POST') {
+        return { status: 200, body: { ...fir, issued_response_token: 'TOKEN123', issued_notice_text: 'NOTICE (case APN-1009)\nUse this private link:\n  /public/responses/TOKEN123\nYou do not need to log in.' } };
+      }
+      return { status: 404, body: {} };
+    });
+    const user = userEvent.setup();
+    render(<LiveCases now={NOW} />);
+    await user.selectOptions(screen.getByLabelText('Act as'), 'authorized_officer');
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+    const detail = await screen.findByRole('region', { name: /APN-1009/ });
+    await user.click(within(detail).getByRole('button', { name: 'Record notice served' }));
+    await user.selectOptions(within(detail).getByLabelText('Party'), 'acct:poster-7');
+    await user.click(within(detail).getByRole('button', { name: /submit: record notice served/i }));
+    const pkg = await within(detail).findByText(/Notice package \(shown once\)/);
+    expect(pkg).toBeInTheDocument();
+    expect(detail).toHaveTextContent(/never sends messages or looks anyone up/);
+    expect(detail).toHaveTextContent('/public/responses/TOKEN123');
+    expect(within(detail).getByLabelText('Notice text')).toHaveTextContent('You do not need to log in.');
+
   });
 });
