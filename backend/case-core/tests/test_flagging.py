@@ -15,36 +15,88 @@ def code(exc: pytest.ExceptionInfo) -> str:
     return exc.value.code
 
 
-# ------------------------------------------------ lies and plain abuse are not flagged
+# --------------------- everyday abuse and criticism are not flagged; context decides the rest
 
-@pytest.mark.parametrize(
-    "behaviors",
-    [["insult"], ["false_statement"], ["criticism"], ["insult", "false_statement"], ["insult", "criticism"]],
-)
-def test_insults_lies_and_criticism_alone_are_never_flagged(svc, session, behaviors):
-    result = svc.create_alert(AI, **alert_kwargs(behaviors=behaviors, category=Category.HATE))
+NOT_FLAGGED = [
+    (["casual_profanity"], []),
+    (["casual_profanity"], ["friendly_banter"]),
+    (["casual_profanity", "insult"], ["casual_talk"]),
+    (["insult"], []),
+    (["criticism"], []),
+    (["false_statement"], []),
+    (["insult", "false_statement"], []),
+    # Aggressive wording, but nothing in the situation shows an aggravator.
+    (["aggressive_abuse"], []),
+    (["aggressive_abuse"], ["friendly_banter"]),
+    (["aggressive_abuse"], ["casual_talk", "satire"]),
+    # Crude abuse of a public official or leader is not flagged on that basis, however heavy or organised.
+    (["aggressive_abuse"], ["political_commentary", "public_official_target"]),
+    (["aggressive_abuse"], ["public_official_target", "repeated_targeting", "coordinated_campaign"]),
+    (["aggressive_abuse", "insult"], ["public_official_target", "power_imbalance"]),
+]
+
+FLAGGED = [
+    (["aggressive_abuse"], ["private_individual_target", "repeated_targeting"]),
+    (["aggressive_abuse"], ["target_is_minor"]),
+    (["aggressive_abuse"], ["power_imbalance"]),
+    (["aggressive_abuse"], ["coordinated_campaign", "private_individual_target"]),
+    # An aggravator outweighs a "banter" tag, so a human looks.
+    (["aggressive_abuse"], ["friendly_banter", "repeated_targeting"]),
+    # Threats and the other hard behaviours are flagged for everyone alike, public officials included.
+    (["threat"], ["public_official_target"]),
+    (["incitement_to_violence"], ["political_commentary"]),
+    (["insult", "sexual_harassment"], []),
+    (["casual_profanity", "targeted_hate"], []),
+    (["insult", "extortion"], []),
+    (["insult", "child_involved"], []),
+]
+
+
+@pytest.mark.parametrize("behaviors,situation", NOT_FLAGGED)
+def test_everyday_abuse_criticism_and_abuse_of_officials_are_not_flagged(svc, session, behaviors, situation):
+    result = svc.create_alert(AI, **alert_kwargs(behaviors=behaviors, situation=situation, category=Category.HATE))
     assert result.outcome == "no_flag" and result.case is None
     entry = [e for e in Ledger(session).entries() if e.action == "triage.no_flag"][-1]
     assert entry.case_id is None  # the drop is auditable, and no case or person record exists
-    assert entry.payload["behaviors"] == sorted(behaviors)
+    assert entry.payload["behaviors"] == sorted(behaviors) and entry.payload["situation"] == sorted(situation)
 
 
-@pytest.mark.parametrize(
-    "extra",
-    ["threat", "sexual_content", "sexual_harassment", "targeted_hate", "incitement_to_violence", "extortion", "child_involved"],
-)
-def test_abuse_combined_with_an_actionable_behaviour_is_flagged(svc, extra):
-    result = svc.create_alert(AI, **alert_kwargs(behaviors=["insult", extra]))
+@pytest.mark.parametrize("behaviors,situation", FLAGGED)
+def test_aggressive_abuse_with_context_and_hard_behaviours_are_flagged_for_human_review(svc, behaviors, situation):
+    result = svc.create_alert(AI, **alert_kwargs(behaviors=behaviors, situation=situation))
     assert result.outcome == "flagged" and result.case.stage == Stage.RECEIVED.value
+    assert result.case.situation == sorted(situation)
 
 
-def test_the_behaviour_vocabulary_is_closed_so_free_text_cannot_bypass_policy(svc):
+def test_the_policy_gives_officials_and_leaders_no_extra_protection():
+    from app import domain
+
+    assert domain.decide_flag(["aggressive_abuse"], ["public_official_target"]).flag is False
+    assert domain.decide_flag(["insult"], ["public_official_target"]).flag is False
+    # Being a public official is never an aggravator, and the vocabulary has no leader-specific offence.
+    assert domain.PUBLIC_OFFICIAL_TARGET not in domain.AGGRAVATING_SITUATIONS
+    vocabulary = " ".join(sorted(domain.KNOWN_BEHAVIORS | domain.KNOWN_SITUATIONS)).lower()
+    for word in ("lese", "sedition", "insult_to_leader", "defam"):
+        assert word not in vocabulary
+    # Same threat, same outcome, whoever the target is.
+    assert domain.decide_flag(["threat"], ["public_official_target"]).flag == domain.decide_flag(["threat"], []).flag
+
+
+def test_the_vocabularies_are_closed_so_free_text_cannot_bypass_policy(svc):
     with pytest.raises(PolicyViolation) as exc:
         svc.create_alert(AI, **alert_kwargs(behaviors=["totally_a_threat_trust_me"]))
     assert code(exc) == "unknown_behavior"
     with pytest.raises(PolicyViolation) as exc:
+        svc.create_alert(AI, **alert_kwargs(behaviors=["aggressive_abuse"], situation=["vibes"]))
+    assert code(exc) == "unknown_situation"
+    with pytest.raises(PolicyViolation) as exc:
         svc.create_alert(AI, **alert_kwargs(behaviors=[]))
     assert code(exc) == "behaviors_required"
+    with pytest.raises(PolicyViolation) as exc:
+        svc.create_alert(
+            AI, **alert_kwargs(behaviors=["aggressive_abuse"], situation=["public_official_target", "private_individual_target"])
+        )
+    assert code(exc) == "conflicting_situation"
 
 
 def test_the_flag_attaches_to_the_clip_and_there_is_no_person_record(svc):

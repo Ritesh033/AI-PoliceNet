@@ -14,6 +14,7 @@ from .domain import (
     CONTEXT_GATED_ACTIONS,
     FINDING_OUTCOMES,
     KNOWN_BEHAVIORS,
+    KNOWN_SITUATIONS,
     KNOWN_CHECKS,
     REFERRAL_TARGET,
     REQUIRED_CONTEXT_FINDINGS,
@@ -24,9 +25,10 @@ from .domain import (
     CaseKind,
     Kind,
     PolicyViolation,
+    PUBLIC_OFFICIAL_TARGET,
     Role,
     Stage,
-    should_flag,
+    decide_flag,
 )
 from .ledger import Ledger, iso, utcnow
 from .models import Case, CaseItem
@@ -68,6 +70,7 @@ class CaseService:
         confidence: float,
         content_fingerprint: str,
         behaviors: Sequence[str],
+        situation: Sequence[str] = (),
         priority: str = "routine",
         signals: Sequence[str] = (),
         evidence: Sequence[dict] = (),
@@ -88,19 +91,28 @@ class CaseService:
         unknown = set(behaviors) - KNOWN_BEHAVIORS
         if unknown:
             raise PolicyViolation("unknown_behavior", f"Unknown behaviours {sorted(unknown)}; allowed: {sorted(KNOWN_BEHAVIORS)}", 422)
+        unknown_situation = set(situation) - KNOWN_SITUATIONS
+        if unknown_situation:
+            raise PolicyViolation(
+                "unknown_situation", f"Unknown situation tags {sorted(unknown_situation)}; allowed: {sorted(KNOWN_SITUATIONS)}", 422
+            )
+        if PUBLIC_OFFICIAL_TARGET in situation and "private_individual_target" in situation:
+            raise PolicyViolation("conflicting_situation", "A target cannot be both a public official and a private individual", 422)
         for item in evidence:
             self._check_hash(item.get("sha256"))
 
-        # Policy gate: lies and personal abuse alone are not flagged. The decision is still recorded (content
-        # fingerprint and behaviours only, no person) so auditors can see what the AI saw and dropped.
-        if not should_flag(behaviors):
-            reason = "No actionable behaviour. Insults, criticism or false statements alone are not flagged."
+        # Policy gate (see domain.decide_flag): casual abuse and criticism, including crude abuse aimed at public
+        # officials, are not flagged. The decision is still recorded (content fingerprint, behaviours and situation
+        # only, no person) so auditors can see what the AI saw and dropped.
+        decision = decide_flag(behaviors, situation)
+        if not decision.flag:
             self.ledger.append(
                 case_id=None, actor=actor, action="triage.no_flag",
-                payload={"content_fingerprint": content_fingerprint, "behaviors": sorted(behaviors), "reason": reason},
+                payload={"content_fingerprint": content_fingerprint, "behaviors": sorted(behaviors),
+                         "situation": sorted(situation), "reason": decision.reason},
             )
             self.session.commit()
-            return TriageResult("no_flag", None, reason)
+            return TriageResult("no_flag", None, decision.reason)
 
         # Same clip, same issue: add the information to the existing case. A second FIR is never opened.
         existing = self._existing_for_fingerprint(content_fingerprint)
@@ -116,9 +128,9 @@ class CaseService:
         case = self._new_case(
             actor, CaseKind.SOCIAL, category, title, summary, confidence, priority, signals, evidence,
             subject_ids=[], complainant_id=None, affected_party_id=affected_party_id,
-            behaviors=sorted(behaviors), content_fingerprint=content_fingerprint,
+            behaviors=sorted(behaviors), situation=sorted(situation), content_fingerprint=content_fingerprint,
         )
-        return TriageResult("flagged", case, "Temporary flag on the clip. Context checks and human review follow.")
+        return TriageResult("flagged", case, decision.reason)
 
     def file_complaint(
         self,
@@ -161,7 +173,7 @@ class CaseService:
         self, actor: Actor, kind: CaseKind, category: Category, title: str, summary: str, confidence: float,
         priority: str, signals: Sequence[str], evidence: Sequence[dict], *, subject_ids: list[str],
         complainant_id: str | None, affected_party_id: str | None, behaviors: Sequence[str] = (),
-        content_fingerprint: str | None = None,
+        situation: Sequence[str] = (), content_fingerprint: str | None = None,
     ) -> Case:
         if not title.strip() or not summary.strip():
             raise PolicyViolation("empty_text", "title and summary are required", 422)
@@ -174,7 +186,8 @@ class CaseService:
         case = Case(
             id=f"APN-{1001 + count}", kind=kind.value, category=category.value, title=title.strip(),
             summary=summary.strip(), priority=priority, confidence=confidence, stage=Stage.RECEIVED.value,
-            signals=list(signals), behaviors=list(behaviors), content_fingerprint=content_fingerprint,
+            signals=list(signals), behaviors=list(behaviors), situation=list(situation),
+            content_fingerprint=content_fingerprint,
             subject_ids=subject_ids, complainant_id=complainant_id, affected_party_id=affected_party_id,
             checks=[], decision_due_at=due, created_at=now, updated_at=now,
         )
@@ -184,7 +197,7 @@ class CaseService:
         for item in evidence:
             self.session.add(
                 CaseItem(
-                    case_id=case.id, kind="evidence", label=item.get("label", "Evidence"), sha256=item.get("sha256"),
+                    case=case, kind="evidence", label=item.get("label", "Evidence"), sha256=item.get("sha256"),
                     description=item.get("description", ""), preview_withheld=withheld,
                     added_by=actor.id, added_at=now,
                 )
@@ -192,7 +205,7 @@ class CaseService:
         self.ledger.append(
             case_id=case.id, actor=actor, action="case.created",
             payload={"to": Stage.RECEIVED.value, "kind": kind.value, "category": category.value,
-                     "behaviors": list(behaviors), "priority": priority, "confidence": confidence,
+                     "behaviors": list(behaviors), "situation": list(situation), "priority": priority, "confidence": confidence,
                      "content_fingerprint": content_fingerprint, "decision_due_at": due,
                      "evidence_hashes": [e.get("sha256") for e in evidence]},
         )
@@ -356,7 +369,7 @@ class CaseService:
         if case.stage in FROZEN_STAGES:
             raise PolicyViolation("case_closed", "This case is closed or merged", 409)
         item = CaseItem(
-            case_id=case.id, kind="context_finding", label=key, outcome=outcome, description=summary.strip(),
+            case=case, kind="context_finding", label=key, outcome=outcome, description=summary.strip(),
             sha256=sha256, added_by=actor.id, added_at=iso(self.clock()),
         )
         self.session.add(item)
@@ -388,7 +401,7 @@ class CaseService:
         case = self.get_case_unchecked(case_id)
         now = iso(self.clock())
         item = CaseItem(
-            case_id=case.id, kind="advisory", label=recommendation.strip(), description=rationale,
+            case=case, kind="advisory", label=recommendation.strip(), description=rationale,
             added_by=actor.id, added_at=now,
         )
         self.session.add(item)
@@ -418,7 +431,7 @@ class CaseService:
         now = self.clock()
         late = bool(case.window_closes_at and iso(now) > case.window_closes_at)
         item = CaseItem(
-            case_id=case.id, kind="response", label=label.strip(), description=description, sha256=sha256,
+            case=case, kind="response", label=label.strip(), description=description, sha256=sha256,
             late=late, added_by=actor.id, added_at=iso(now),
         )
         self.session.add(item)

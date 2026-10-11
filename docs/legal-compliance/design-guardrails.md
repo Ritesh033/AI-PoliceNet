@@ -12,10 +12,38 @@ and criminal-law experts should review them before any legal adoption.
    and the IT Act.
 3. **Independent adjudication.** Courts and disciplinary authorities decide liability, with appeal rights.
 
+## Flagging policy: context decides, not keywords
+
+A flag is only a consequence-free request for a human to look at one clip. It attaches to the clip, never to a
+person. The default policy is a configurable list that legal experts own:
+
+- **Not flagged:** casual or friendly profanity, general-talk abuse, insults, criticism and false statements on
+  their own. The model must judge intent and situation, not match words: common Hindi profanity carries sexual
+  references literally and would otherwise flag millions of ordinary conversations.
+- **Flagged only with aggravating context:** aggressive abuse, when the situation shows repeated targeting of a
+  private person, a coordinated campaign against a private person, a power imbalance, or a minor as the target.
+- **Never flagged on that basis alone:** crude abuse of or criticism aimed at the Prime Minister, ministers or any
+  public official. Officials get no extra protection from criticism, so the platform cannot be used to suppress
+  it. Threats against anyone, officials included, are flagged like any other threat.
+- **Always flagged for human review:** threats, extortion, fraud, impersonation, sexually explicit material,
+  sexual harassment, non-consensual imagery, content involving a child, incitement to violence, and abuse
+  targeting a person or group for caste, religion or another protected trait.
+
+Before any referral the AI must also check whether the clip is from a film, show or skit, whether it is edited or
+partial, what the full original shows, and where else the clip appears. Only copies of the specific clip are
+gathered from public or authorized sources; requests to a platform for user data are made by an authorized officer
+through legal process.
+
 ## Must hold (enforced and tested in `backend/case-core`)
 
 - AI never registers, cancels or closes an FIR, issues an order, or arrests anyone.
 - Only a human authorized officer registers an FIR, with a written basis. Only a judicial authority closes one.
+- A 24-hour clock asks a human to decide on a flagged clip. A missed deadline escalates to a supervisor and never
+  files anything.
+- One FIR per clip. A repeat alert or a related clip adds information to the existing case instead of opening a
+  second FIR, and a court can permit a fresh registration (for example when the full original surfaces later).
+- For the response period the AI keeps researching and can recommend dismissal to the court. It never cancels an
+  FIR itself.
 - The accused cannot "cancel" an FIR by uploading material, and the AI cannot either. A response informs the
   humans who decide, and it is always accepted while the matter is open.
 - A response window starts only when a human records that notice was served. When it passes, nothing happens
@@ -44,6 +72,10 @@ and criminal-law experts should review them before any legal adoption.
 
 ## Open items for legal review
 
+- The exact list of hard behaviours and aggravators, mapped to specific offences, including which are cognizable,
+  which need the aggrieved person's complaint, and which need a magistrate's order before investigation.
+- Whether a second FIR on the same clip is barred in all circumstances, and when fresh information must go to the
+  existing investigation.
 - Which FIR-registration and preliminary-inquiry rules apply to AI-originated information under BNSS.
 - Admissibility of self-uploaded and public-interview confessions and how corroboration is recorded.
 - Data protection (DPDP Act 2023) basis for monitoring public content and storing evidence hashes.

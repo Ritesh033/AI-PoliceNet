@@ -61,31 +61,74 @@ class Category(str, Enum):
 SENSITIVE_CATEGORIES = frozenset({Category.NCII})
 
 # --- Flagging policy -------------------------------------------------------------------------------------------
-# What the AI may flag is a *policy*, owned by legal experts, not an engineering decision. The default below follows
-# the product rule that lies and personal abuse alone are not flagged. A flag needs at least one actionable behaviour.
+# What the AI may flag is a *policy*, owned by legal experts, not an engineering decision. A flag is only a
+# consequence-free request for human review of one clip; it is never an accusation.
+#
+# The model classifies by intent and situation, never by keywords: common profanity (including Hindi words with
+# sexual references) is everyday speech between friends and must not be flagged just because the word appears.
+#
+# Default policy:
+#   * Casual profanity, insults, criticism and false statements alone are never flagged.
+#   * Aggressive abuse is flagged only when the situation shows an aggravator (repeated targeting of a private
+#     person, a coordinated campaign against a private person, a power imbalance, or a minor target).
+#   * Abuse of or criticism aimed at a public official or leader is never flagged on that basis, however crude.
+#     Officials get no extra protection from criticism. Threats and the other hard behaviours below are flagged
+#     for everyone alike, officials included.
 # Legal review must confirm this list: some abuse IS an offence (for example caste-based abuse in public, words
-# insulting a woman's modesty, threats, incitement against a community), which is why those are listed as actionable.
-NON_ACTIONABLE_ALONE = frozenset({"insult", "false_statement", "criticism"})
-ACTIONABLE_BEHAVIORS = frozenset(
+# insulting a woman's modesty, threats, incitement against a community), which is why those are hard behaviours.
+CASUAL_OR_PROTECTED = frozenset({"casual_profanity", "insult", "criticism", "false_statement"})
+CONDITIONAL_BEHAVIORS = frozenset({"aggressive_abuse"})
+HARD_ACTIONABLE = frozenset(
     {
         "threat",
         "extortion",
         "fraud",
         "impersonation",
-        "sexual_content",
-        "sexual_harassment",
+        "sexual_content",  # sexually explicit material; NOT profanity that merely contains a sexual reference
+        "sexual_harassment",  # sexual comments or threats directed at a person
         "non_consensual_imagery",
         "child_involved",
         "incitement_to_violence",
-        "targeted_hate",
+        "targeted_hate",  # abuse aimed at a person or group for caste, religion or another protected trait
         "self_admission",
     }
 )
-KNOWN_BEHAVIORS = NON_ACTIONABLE_ALONE | ACTIONABLE_BEHAVIORS
+KNOWN_BEHAVIORS = CASUAL_OR_PROTECTED | CONDITIONAL_BEHAVIORS | HARD_ACTIONABLE
+
+BENIGN_SITUATIONS = frozenset(
+    {"friendly_banter", "casual_talk", "quoted_or_fictional", "satire", "political_commentary", "public_debate"}
+)
+AGGRAVATING_SITUATIONS = frozenset(
+    {"repeated_targeting", "coordinated_campaign", "power_imbalance", "target_is_minor", "private_individual_target"}
+)
+PUBLIC_OFFICIAL_TARGET = "public_official_target"
+KNOWN_SITUATIONS = BENIGN_SITUATIONS | AGGRAVATING_SITUATIONS | {PUBLIC_OFFICIAL_TARGET}
 
 
-def should_flag(behaviors: "set[str] | frozenset[str] | list[str]") -> bool:
-    return bool(set(behaviors) & ACTIONABLE_BEHAVIORS)
+@dataclass(frozen=True)
+class FlagDecision:
+    flag: bool
+    reason: str
+
+
+def decide_flag(behaviors: "set[str] | frozenset[str] | list[str]", situation: "set[str] | frozenset[str] | list[str]" = ()) -> FlagDecision:
+    b = set(behaviors)
+    s = set(situation)
+    hard = b & HARD_ACTIONABLE
+    if hard:
+        return FlagDecision(True, f"Actionable behaviour detected: {sorted(hard)}. Temporary flag on the clip for human review.")
+    if "aggressive_abuse" in b:
+        if PUBLIC_OFFICIAL_TARGET in s:
+            return FlagDecision(
+                False,
+                "Abuse of or criticism aimed at a public official or leader is not flagged on that basis. "
+                "Officials get no extra protection from criticism, however crude.",
+            )
+        aggravators = s & AGGRAVATING_SITUATIONS
+        if aggravators:
+            return FlagDecision(True, f"Aggressive abuse with aggravating context {sorted(aggravators)}. Temporary flag on the clip for human review.")
+        return FlagDecision(False, "Aggressive language without aggravating context. Banter-style and general-talk abuse is not flagged.")
+    return FlagDecision(False, "No actionable behaviour. Casual profanity, insults, criticism or false statements alone are not flagged.")
 
 
 # Context the AI must have examined before any human can refer a social-media case: is the clip from a film, show

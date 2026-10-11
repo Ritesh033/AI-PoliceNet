@@ -18,6 +18,8 @@ class AlertIn(BaseModel):
     content_fingerprint: str
     # What the model detected, from a closed vocabulary. Insults, criticism or false statements alone are not flagged.
     behaviors: list[str]
+    # The situation the model judged: banter, political commentary, repeated targeting, and so on. Closed vocabulary.
+    situation: list[str] = []
     priority: str = "routine"
     signals: list[str] = []
     evidence: list[EvidenceIn] = []

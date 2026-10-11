@@ -76,7 +76,7 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
         out = {
             "id": c.id, "kind": c.kind, "category": c.category, "title": c.title, "summary": c.summary,
             "priority": c.priority, "confidence": c.confidence, "stage": c.stage, "signals": c.signals,
-            "behaviors": c.behaviors, "content_fingerprint": c.content_fingerprint,
+            "behaviors": c.behaviors, "situation": c.situation, "content_fingerprint": c.content_fingerprint,
             "checks": c.checks, "referred_to_role": c.referred_to_role, "notice_served_at": c.notice_served_at,
             "window_closes_at": c.window_closes_at, "response_received": c.response_received,
             "court_reviewed": c.court_reviewed, "appeal_open": c.appeal_open,

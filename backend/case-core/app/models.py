@@ -21,6 +21,7 @@ class Case(Base):
     stage: Mapped[str] = mapped_column(String(24), default="received")
     signals: Mapped[list] = mapped_column(JSON, default=list)
     behaviors: Mapped[list] = mapped_column(JSON, default=list)
+    situation: Mapped[list] = mapped_column(JSON, default=list)
     # The flag attaches to a specific piece of content (an opaque fingerprint from the AI service), never to a person.
     content_fingerprint: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     # People. Subjects can never act on the case; parties can respond to it.

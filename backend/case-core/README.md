@@ -12,39 +12,43 @@ and a **tamper-evident ledger** that records every step.
 cd backend/case-core
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
-python -m pytest -q                                   # 54 tests
+python -m pytest -q                                   # 117 tests
 APN_ENV=demo APN_CHECKPOINT_KEY=change-me uvicorn app.main:app --port 8100
 # interactive docs: http://localhost:8100/docs
 ```
 
 Environment: `APN_ENV` (must be `demo`), `DATABASE_URL` (default SQLite file), `APN_RESPONSE_WINDOW_DAYS`
-(default 10), `APN_CHECKPOINT_KEY` (signs ledger checkpoints).
+(default 10), `APN_DECISION_SLA_HOURS` (default 24), `APN_CHECKPOINT_KEY` (signs ledger checkpoints).
 
-Demo auth: send `X-Actor-Id` and `X-Actor-Role` (`ai_service`, `reviewer`, `authorized_officer`,
-`supervisory_authority`, `judicial_authority`, `citizen`, `auditor`).
+Demo auth: send `X-Actor-Id` and `X-Actor-Role` (`ai_service`, `system` (scheduler), `reviewer`,
+`authorized_officer`, `supervisory_authority`, `judicial_authority`, `citizen`, `auditor`).
 
 ## Workflow
 
 ```
 received -> in_review -> referred -> inquiry -> fir_registered -> closed_by_court
                 \-> closed_no_action  (reviewer, officer or supervisory authority; always with a written reason)
+                \-> linked           (related clip merged into an existing case as supplementary information)
 ```
 
 | Endpoint | Who | What |
 | --- | --- | --- |
-| `POST /alerts` | AI service | Raise an alert. Evidence is a hash plus label; media is never stored. |
+| `POST /alerts` | AI service | Submit what the model saw (`behaviors`, `situation`, a clip `content_fingerprint`). Returns `outcome`: `flagged` (201, temporary flag on the clip), `no_flag` (200, dropped by policy, recorded without any person) or `duplicate` (200, attached to the case already tracking that clip). Evidence is a hash plus label; media is never stored. |
+| `POST /cases/{id}/context-findings` | AI service | Full-context research: `media_source` (film, show, skit), `edit_detection`, `full_context`, `cross_platform_copies`. Referral is blocked until all four exist and a human records `record_check: context`. |
 | `POST /complaints` | Citizen | File a conduct complaint naming the official or office. |
-| `POST /cases/{id}/actions` | Humans, by role | `assign`, `record_check`, `request_context`, `no_action`, `refer`, `open_inquiry`, `decline`, `register_fir`, `serve_notice`, `court_proceed`, `court_close`, `appeal`, `resolve_appeal` |
-| `POST /cases/{id}/advisory` | AI service | Attach a recommendation. Recorded as non-binding; never moves a case. |
+| `POST /cases/{id}/actions` | Humans, by role | `assign`, `record_check`, `request_context`, `no_action`, `refer`, `open_inquiry`, `decline`, `register_fir`, `serve_notice`, `court_proceed`, `court_close`, `permit_fresh_registration`, `link_supplementary`, `appeal`, `resolve_appeal` |
+| `POST /cases/{id}/advisory` | AI service | Attach a recommendation (`kind`: `info` or `dismissal`). Recorded as non-binding; never moves a case. A `dismissal` advisory puts an FIR in the court's queue. |
 | `POST /cases/{id}/responses` | A party | Submit counter-material. Always accepted while the matter is open; late ones are marked late. |
 | `GET /attention/window-elapsed` | Staff | Cases whose response window passed. Asks a human to follow up; changes nothing. |
+| `POST /attention/sweep`, `GET /attention/overdue-decisions` | Scheduler, staff | Records once that a case missed its 24-hour human-decision deadline and must go to a supervisor. Files nothing. |
+| `GET /attention/dismissal-recommendations` | Judicial authority, auditor | FIRs where the AI's continuing research recommends dismissal. Only a court can act. |
 | `GET /ledger`, `/ledger/verify`, `/ledger/checkpoint` | Auditor, judicial authority | Read, verify and sign the audit chain. |
 
 ## Guardrails (each is a test)
 
 | Rule | Where | Tests |
 | --- | --- | --- |
-| AI can raise alerts and add advisory notes only; every workflow action by an AI is refused | `service._authorize` | `test_ai_cannot_perform_any_workflow_action` (one per action), `test_ai_advisory_is_recorded_but_never_moves_a_case` |
+| AI can raise alerts and add advisory notes only; every workflow action by an AI is refused | `service._authorize` | `test_automated_actors_cannot_perform_any_workflow_action` (every action, for the AI and the scheduler), `test_ai_advisory_is_recorded_but_never_moves_a_case` |
 | Only an authorized officer registers an FIR, and must state a basis | `domain.ACTIONS` | `test_only_an_authorized_officer_registers_an_fir_and_must_state_a_basis` |
 | Only a judicial authority closes a registered FIR; a response never cancels one | `domain.ACTIONS` | `test_only_a_judicial_authority_can_close_a_registered_fir`, `test_the_accused_cannot_cancel_their_own_fir_by_uploading` |
 | The response window starts only when a human records that notice was served | `service.act` | `test_window_starts_only_when_notice_is_recorded_as_served` |
@@ -54,6 +58,14 @@ received -> in_review -> referred -> inquiry -> fir_registered -> closed_by_cour
 | Nobody named in a case can act on it | `service._authorize` | `test_a_named_subject_can_never_act_on_their_own_case` |
 | Self-uploaded confession videos need human wellbeing and authenticity checks first | `domain.CONFESSION_GATED_ACTIONS` | `test_confession_video_needs_human_wellbeing_and_authenticity_checks_before_referral` |
 | No strike, flag or lock state exists that could restrict a court | `domain`, `models` | `test_no_flag_or_strike_state_exists_that_could_block_judicial_relief` |
+| Lies, criticism and everyday abuse are not flagged; aggressive abuse is flagged only with an aggravating situation | `domain.decide_flag` | `test_everyday_abuse_criticism_and_abuse_of_officials_are_not_flagged`, `test_aggressive_abuse_with_context_and_hard_behaviours_are_flagged_for_human_review` |
+| Crude abuse of a public official or leader is not flagged on that basis; threats against anyone are | `domain.decide_flag` | `test_the_policy_gives_officials_and_leaders_no_extra_protection` |
+| Closed vocabularies, so free text cannot bypass the policy; classification is by intent, not keywords | `service.create_alert` | `test_the_vocabularies_are_closed_so_free_text_cannot_bypass_policy` |
+| The flag attaches to a clip, never a person | `models.Case` | `test_the_flag_attaches_to_the_clip_and_there_is_no_person_record` |
+| No referral until the AI has checked for film/show source, edits, the full original and other copies, and a human acknowledges | `service._authorize` | `test_a_human_cannot_refer_until_the_full_context_checks_are_done` |
+| One FIR per clip; repeats and related clips add information to the existing case; a court can permit a fresh registration | `service.create_alert`, `service._authorize` | `test_a_repeat_alert_on_the_same_clip_adds_information_and_never_opens_a_second_case`, `test_an_fir_cannot_be_registered_twice_on_the_same_clip_even_by_a_path_that_skips_dedupe`, `test_a_court_can_permit_a_fresh_registration_so_the_rule_is_not_a_trap` |
+| A missed 24-hour deadline escalates to a supervisor and files nothing | `service.sweep_deadlines` | `test_a_missed_deadline_escalates_to_a_supervisor_and_files_nothing` |
+| AI dismissal recommendations reach the court queue and cancel nothing | `service.add_advisory` | `test_an_ai_dismissal_recommendation_reaches_the_court_queue_but_cancels_nothing` |
 | Sensitive media is hash-only and marked preview-withheld | `service._new_case` | `test_sensitive_evidence_stores_hash_only_and_marks_preview_withheld` |
 
 ## The ledger: tamper-evident, not tamper-proof

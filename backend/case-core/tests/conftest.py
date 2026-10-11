@@ -79,7 +79,7 @@ def session(engine):
 
 @pytest.fixture
 def svc(session, clock) -> CaseService:
-    settings = Settings(env="demo", database_url="sqlite://", response_window_days=10, checkpoint_key="test-key")
+    settings = Settings(env="demo", database_url="sqlite://", response_window_days=10, decision_sla_hours=24, checkpoint_key="test-key")
     return CaseService(session, clock, settings)
 
 
