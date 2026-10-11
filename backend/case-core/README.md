@@ -12,7 +12,7 @@ and a **tamper-evident ledger** that records every step.
 cd backend/case-core
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
-python -m pytest -q                                   # 202 tests
+python -m pytest -q                                   # 203 tests
 APN_ENV=demo APN_CHECKPOINT_KEY=change-me python -m app.demo_seed      # optional: 11 invented sample cases
 APN_ENV=demo APN_CHECKPOINT_KEY=change-me APN_CORS_ORIGINS=http://localhost:3100 uvicorn app.main:app --port 8100
 # interactive docs: http://localhost:8100/docs
