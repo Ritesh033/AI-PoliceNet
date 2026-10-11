@@ -223,6 +223,8 @@ def test_the_notice_explains_why_what_it_means_and_how_to_respond_without_loggin
         "lawyer",
     ):
         assert phrase in lowered, phrase
+    assert "a human reads the material you send" in lowered
+    assert "may also compare it" in lowered  # promises no automatic matching the platform does not yet do
     assert "what was checked before the officer decided" in lowered
     assert "from a film, show or skit" in lowered
 

@@ -65,8 +65,8 @@ def build_notice(case: Case, response_link: str, window_days: int) -> str:
         "You can send the full, unedited video of the incident, or any other material, from any account or device. "
         "You do not have to say who you are in order to upload. Use this private link, which belongs to this case only:",
         f"  {response_link}",
-        "The material you send is matched to the flagged clip automatically. A human reads it, and a court can review "
-        "the case at any time.",
+        "A human reads the material you send. Automated checks may also compare it with the flagged clip, and a court "
+        "can review the case at any time.",
         "",
         "Time",
         f"Please respond within {window_days} days if you can. If that time passes, nothing happens to you "
