@@ -6,7 +6,7 @@ import { Card } from '../Card';
 import { Icon } from '../Icon';
 import { PriorityBadge } from '../Badges';
 import { CaseDetailLive } from './CaseDetailLive';
-import { API_STAGE_LABEL } from './labels';
+import { API_STAGE_LABEL, TRACK_LABEL } from './labels';
 
 const DEFAULT_URL = 'http://localhost:8100';
 
@@ -214,6 +214,9 @@ export function LiveCases({ now }: { now: number }) {
                             <p className="mt-0.5 text-ink">{c.title}</p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                               <PriorityBadge priority={c.priority} />
+                              {c.track !== 'criminal' && (
+                                <span className="text-xs text-ink-2">{TRACK_LABEL[c.track]?.split(' (')[0] ?? c.track}</span>
+                              )}
                               {c.kind === 'social' && c.context_missing.length > 0 && (
                                 <span className="text-xs text-ink-2">context: {c.context_missing.length} to do</span>
                               )}

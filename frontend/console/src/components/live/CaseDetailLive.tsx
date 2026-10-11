@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, type ApiClient } from '../../api/client';
-import type { ActionMeta, ApiCase, ApiItem, ApiParty, ApiRole, LedgerRow, VerifyResult } from '../../api/types';
+import type { ActionMeta, ApiCase, ApiItem, ApiParty, ApiPenalty, ApiRole, LedgerRow, VerifyResult } from '../../api/types';
 import { API_ROLES } from '../../api/types';
 import { dueLabel, fmtDateTime } from '../../lib/format';
 import { Card } from '../Card';
@@ -8,7 +8,7 @@ import { Icon } from '../Icon';
 import { PriorityBadge } from '../Badges';
 import {
   ACTION_LABEL, API_STAGE_LABEL, BEHAVIOR_LABEL, CONTEXT_KEYS, DETERMINATION_LABEL, OUTCOME_LABEL, PARTY_ROLE_LABEL,
-  SCENARIO_LABEL, SCENARIO_RULE,
+  REVIEW_LABEL, SANCTION_LABEL, SCENARIO_LABEL, SCENARIO_RULE, TRACK_LABEL, TRACK_RULE,
 } from './labels';
 
 interface Props {
@@ -40,6 +40,9 @@ export function CaseDetailLive({ item, meta, role, client, now, onChanged }: Pro
         <span className="inline-flex items-center rounded-full border border-line bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink-2">
           {API_STAGE_LABEL[item.stage]}
         </span>
+        <span className="inline-flex items-center rounded-full border border-dashed px-2 py-0.5 text-xs font-medium text-ink-2" style={{ borderColor: 'var(--axis)' }}>
+          {TRACK_LABEL[item.track] ?? item.track}
+        </span>
         {item.dismissal_recommended && (
           <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-text">
             <Icon name="scale" size={12} /> AI recommends dismissal (court decides)
@@ -53,6 +56,7 @@ export function CaseDetailLive({ item, meta, role, client, now, onChanged }: Pro
       </div>
 
       <p className="text-sm leading-6 text-ink">{item.summary}</p>
+      {TRACK_RULE[item.track] && <p className="mt-2 text-xs leading-5 text-ink-2">{TRACK_RULE[item.track]}</p>}
 
       {(item.behaviors.length > 0 || item.situation.length > 0) && (
         <div className="mt-3 text-sm">
@@ -89,6 +93,26 @@ export function CaseDetailLive({ item, meta, role, client, now, onChanged }: Pro
       {item.kind === 'social' && <ContextChecklist item={item} findings={findings} />}
 
       {(item.parties?.length ?? 0) > 0 && <WhoIsWho item={item} />}
+
+      {(item.reviews_due?.length ?? 0) > 0 && (
+        <div role="note" className="mt-4 rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm text-ink">
+          <p className="font-semibold">A human authority is asked to review</p>
+          <ul className="mt-1 space-y-1">
+            {item.reviews_due!.map((r) => (
+              <li key={`${r.party_ref}-${r.threshold}`}>
+                <span className="font-mono text-xs">{r.party_ref}</span> has {r.count} recorded sanctions:{' '}
+                {REVIEW_LABEL[r.kind] ?? r.kind}.
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs leading-5 text-ink-2">
+            A count only asks for this review. It suspends, removes and fines no one, and it restricts no court. A supervisory
+            authority answers it in writing.
+          </p>
+        </div>
+      )}
+
+      {(item.penalties?.length ?? 0) > 0 && <Penalties penalties={item.penalties!} />}
 
       {evidence.length > 0 && (
         <>
@@ -133,6 +157,26 @@ export function CaseDetailLive({ item, meta, role, client, now, onChanged }: Pro
         <span>{item.ai_notice}</span>
       </p>
     </Card>
+  );
+}
+
+function Penalties({ penalties }: { penalties: ApiPenalty[] }) {
+  return (
+    <>
+      <h3 className="mt-4 text-sm font-semibold text-ink">Challans and sanctions (each recorded by a named human)</h3>
+      <ul className="mt-1.5 space-y-1.5 text-sm" aria-label="Challans and sanctions">
+        {penalties.map((p) => (
+          <li key={p.id} className={p.revoked ? 'text-ink-3 line-through' : 'text-ink'}>
+            <span className="font-mono text-xs text-ink-2">{p.party_ref}</span> · {SANCTION_LABEL[p.kind] ?? p.kind}
+            {p.amount_inr !== null && ` · ₹${p.amount_inr.toLocaleString('en-IN')}`}
+            <span className="block text-xs text-ink-2 no-underline">
+              {p.legal_basis} · by {p.issued_by}
+              {p.revoked && ` · revoked by ${p.revoked_by}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -214,6 +258,9 @@ function ActionPanel({ item, meta, role, client, onChanged }: Omit<Props, 'now'>
   const [partyRole, setPartyRole] = useState('');
   const [determination, setDetermination] = useState('');
   const [legalBasis, setLegalBasis] = useState('');
+  const [sanctionKind, setSanctionKind] = useState('');
+  const [amountInr, setAmountInr] = useState('');
+  const [penaltyId, setPenaltyId] = useState('');
   const [pkg, setPkg] = useState<{ link: string; text: string } | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [message, setMessage] = useState('');
@@ -229,13 +276,22 @@ function ActionPanel({ item, meta, role, client, onChanged }: Omit<Props, 'now'>
     setPartyRole('');
     setDetermination('');
     setLegalBasis('');
+    setSanctionKind('');
+    setAmountInr('');
+    setPenaltyId('');
     setPkg(null);
     setError(null);
     setMessage('');
   }, [item.id]);
 
+  const activePenalties = (item.penalties ?? []).filter((p) => !p.revoked);
   const available = Object.entries(meta.actions)
     .filter(([name, spec]) => (name === 'resolve_appeal' ? item.appeal_open : spec.from_stages.includes(item.stage)))
+    // Only the steps that belong to this case's track are offered. Register FIR stays visible so its refusal can be seen.
+    .filter(([name]) => name !== 'issue_challan' || item.track === 'civic')
+    .filter(([name]) => name !== 'impose_sanction' || item.track === 'departmental')
+    .filter(([name]) => name !== 'revoke_penalty' || activePenalties.length > 0)
+    .filter(([name]) => name !== 'resolve_review' || (item.reviews_due?.length ?? 0) > 0)
     .filter(([, spec]) => spec.roles.some((r) => CONSOLE_ROLES.has(r)));
   const spec = selected ? meta.actions[selected] : null;
 
@@ -255,6 +311,9 @@ function ActionPanel({ item, meta, role, client, onChanged }: Omit<Props, 'now'>
         party_role: has('party_role') ? partyRole || undefined : undefined,
         determination: has('determination') ? determination || undefined : undefined,
         legal_basis: has('legal_basis') ? legalBasis || undefined : undefined,
+        sanction_kind: has('sanction_kind') ? sanctionKind || undefined : undefined,
+        amount_inr: has('amount_inr') && amountInr !== '' ? Number(amountInr) : undefined,
+        penalty_id: has('penalty_id') && penaltyId !== '' ? Number(penaltyId) : undefined,
       });
       if (updated.issued_response_token && updated.issued_notice_text) {
         setPkg({ link: `/public/responses/${updated.issued_response_token}`, text: updated.issued_notice_text });
@@ -386,13 +445,60 @@ function ActionPanel({ item, meta, role, client, onChanged }: Omit<Props, 'now'>
                   </select>
                 </label>
               )}
+              {spec.params.includes('sanction_kind') && (
+                <label className="block text-sm text-ink-2">
+                  Kind of sanction
+                  <select
+                    value={sanctionKind}
+                    onChange={(e) => setSanctionKind(e.target.value)}
+                    className="mt-1 block min-h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+                  >
+                    <option value="">Choose a sanction</option>
+                    {(meta.sanction_kinds ?? []).map((k) => (
+                      <option key={k} value={k}>
+                        {SANCTION_LABEL[k] ?? k}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {spec.params.includes('amount_inr') && (
+                <label className="block text-sm text-ink-2">
+                  Amount in rupees <span className="text-ink-3">(a challan or a fine only; the law&apos;s schedule governs)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={amountInr}
+                    onChange={(e) => setAmountInr(e.target.value)}
+                    className="mt-1 block min-h-9 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink"
+                  />
+                </label>
+              )}
+              {spec.params.includes('penalty_id') && (
+                <label className="block text-sm text-ink-2">
+                  Challan or sanction to revoke
+                  <select
+                    value={penaltyId}
+                    onChange={(e) => setPenaltyId(e.target.value)}
+                    className="mt-1 block min-h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+                  >
+                    <option value="">Choose one</option>
+                    {activePenalties.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {`${SANCTION_LABEL[p.kind] ?? p.kind} · ${p.party_ref}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {spec.params.includes('legal_basis') && (
                 <label className="block text-sm text-ink-2">
                   Legal basis <span className="text-ink">(required)</span>
                   <input
                     value={legalBasis}
                     onChange={(e) => setLegalBasis(e.target.value)}
-                    placeholder="Notice or order reference"
+                    placeholder="Notice, order, rule or schedule reference"
                     className="mt-1 block min-h-9 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink"
                   />
                 </label>

@@ -21,6 +21,8 @@ class Case(Base):
     priority: Mapped[str] = mapped_column(String(16), default="routine")
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
     stage: Mapped[str] = mapped_column(String(24), default="received")
+    # criminal | civic | departmental. Fixed when the case is opened. Only a criminal case can lead to an FIR.
+    track: Mapped[str] = mapped_column(String(16), default="criminal")
     signals: Mapped[list] = mapped_column(JSON, default=list)
     behaviors: Mapped[list] = mapped_column(JSON, default=list)
     scenario: Mapped[str] = mapped_column(String(48), default="other")
@@ -46,11 +48,14 @@ class Case(Base):
     linked_to: Mapped[str | None] = mapped_column(String(16), nullable=True)
     fresh_registration_permitted: Mapped[bool] = mapped_column(Boolean, default=False)
     dismissal_recommended: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Reviews that a count of recorded sanctions asked a human authority for: [{party_ref, count, threshold, kind}].
+    reviews_due: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[str] = mapped_column(String(40))
     updated_at: Mapped[str] = mapped_column(String(40))
 
     items: Mapped[list["CaseItem"]] = relationship(back_populates="case", order_by="CaseItem.id")
     parties: Mapped[list["CaseParty"]] = relationship(back_populates="case", order_by="CaseParty.id")
+    penalties: Mapped[list["CasePenalty"]] = relationship(back_populates="case", order_by="CasePenalty.id")
 
     # Not persisted: set only on the instance returned by the action that served notice, so the response token and
     # notice text reach the officer once and are never readable again.
@@ -76,6 +81,30 @@ class CaseParty(Base):
     determined_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
     case: Mapped[Case] = relationship(back_populates="parties")
+
+
+class CasePenalty(Base):
+    """A challan or sanction that a named human authority recorded against one pseudonymous party.
+    The amount and the legal basis are the authority's. Nothing here is imposed by software."""
+
+    __tablename__ = "case_penalties"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id"))
+    party_ref: Mapped[str] = mapped_column(String(64), index=True)
+    party_role: Mapped[str] = mapped_column(String(32))
+    kind: Mapped[str] = mapped_column(String(24))  # challan | warning | fine | suspension | licence_cancellation | removal_order
+    amount_inr: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    legal_basis: Mapped[str] = mapped_column(Text)
+    note: Mapped[str] = mapped_column(Text)
+    issued_by: Mapped[str] = mapped_column(String(64))
+    issued_at: Mapped[str] = mapped_column(String(40))
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    revoked_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    revoked_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    revoked_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+    case: Mapped[Case] = relationship(back_populates="penalties")
 
 
 class CaseItem(Base):

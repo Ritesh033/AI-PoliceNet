@@ -48,6 +48,39 @@ pseudonymous references from the platform feed. The AI proposes roles; only an a
   who also appears in it is judged separately in each role.
 - An FIR in these cases cannot be registered until an officer has decided who is a subject, a victim or a witness.
 
+## Civic violations and official conduct: a challan or a sanction, not an FIR
+
+Not everything seen on social media is a crime, and the platform does not treat it as one. Every case is on one track
+that is fixed when it opens, and the track decides what can follow.
+
+- **Civic violations** (a car parked across a road or highway, spitting gutka, urinating on a public wall, dumping
+  waste in a river) are not offences for the purposes of this platform. No FIR can be registered on them. A human
+  authorized officer can issue a **challan** to each person an officer has determined to be a subject: the person who
+  did it, or the registered owner of the vehicle. Whoever filmed or posted the clip is never one. A challan is not a
+  flag and nothing counts it. It can be contested and appealed.
+- **Official misconduct that is not an offence in itself** (stopping people and fining them without papers or inquiry,
+  keeping private persons alongside to do official work, rude or arbitrary conduct) is considered only when the clip
+  shows a person acting in an official capacity, and never when it is a film scene. It goes to the supervisory
+  authority, not to the force being filmed. A competent authority can record a **sanction** (warning, fine,
+  suspension, licence or contract cancellation, removal order) against **each** person decided to be a subject: the
+  official, a private person acting for them, a contractor or licensee. Whoever posted the clip, or was treated that
+  way, is never one.
+- A sanction needs a **notice** to that person first. A fine, a licence cancellation and a removal order also need the
+  person to have been heard (a response on file, or the response window passed; silence is never an admission), and a
+  removal order follows an inquiry. A warning or an interim suspension needs the notice but not the full window.
+- **Beating or torturing anyone, and demanding a bribe, are offences** for everyone, officials included. They are
+  flagged for human review like any other hard behaviour. Whether force was lawful (for example a documented arrest
+  on a warrant) is for the human who reviews the facts, not for the model.
+- **A count asks; it never acts.** A count of recorded, unrevoked warnings and fines against the same public servant
+  asks the supervisory authority for a written review at 3 (whether to suspend, as an interim measure) and at 7
+  (whether to open an inquiry for removal). The count is of sanctions that a named human authority recorded after a
+  notice, never of raw AI flags and never of challans. It suspends, removes and fines no one, it restricts no court,
+  and it falls when a sanction is revoked by the supervisory authority or a court.
+- The amounts are set by the law or schedule that applies. The platform's floors (10,000 rupees for a challan,
+  1,000,000 for a departmental fine) are **settings that a deployment must replace** with figures a statute or rule
+  supports. Existing law does not support every figure: for example, the Police Act, 1861 section 7 caps a fine on a
+  subordinate police officer at one month's pay, so a fixed 10 lakh minimum would exceed it. Counsel must confirm.
+
 ## Notices and identification
 
 - The platform never looks up, stores or messages anyone's name, phone number, email or WhatsApp number. The schema has
@@ -84,7 +117,9 @@ pseudonymous references from the platform feed. The AI proposes roles; only an a
   need an inquiry before any FIR decision. Anyone named in a case is barred from acting on it.
 - Every decision needs a written reason in a hash-chained ledger that auditors can verify.
 - No count of alerts, complaints or flags can restrict anyone's access to any court. Consequences come from
-  verified findings by competent authorities, with appeal.
+  verified findings by competent authorities, with appeal. The only count the platform keeps, of recorded sanctions
+  against a public servant, can ask a human authority for a review and does nothing else.
+- Only a human authority issues a challan or records a sanction. A civic or departmental case can never reach an FIR.
 - Sensitive media is never previewed in the console; only a hash and metadata are stored in the case record.
 
 ## Explicit non-goals (will not be built)
@@ -93,7 +128,9 @@ pseudonymous references from the platform feed. The AI proposes roles; only an a
 | --- | --- |
 | Automatic arrest or detention from an AI flag | A hacked account, a deepfake or a false complaint would jail an innocent person. Arrest needs a human officer with grounds and accountability. |
 | AI deciding FIR cancellation or issuing orders | AI cannot judge intent or context and can be fooled by synthetic video. Adjudication stays with courts. |
-| A flag count (for example 7) that locks an order beyond the Supreme Court | Anyone who can generate flags could permanently remove a rival's legal protection. Judicial review is part of the basic structure of the Constitution. |
+| A flag count (for example 3 or 7) that suspends or permanently removes a public servant automatically, beyond the reach of any court or the President | Anyone who can generate flags could remove a rival. Suspension and removal are orders of a competent authority after notice (Article 311(2) requires an inquiry before dismissal, removal or reduction in rank), and judicial review is part of the basic structure of the Constitution. The platform instead asks a human authority for a review at 3 and at 7 recorded sanctions. |
+| Software that fines, suspends, cancels a licence or removes anyone | Penalties are orders of a competent authority after notice and a hearing, with a legal basis. The platform records what a named human decides. |
+| A fixed minimum fine (for example 10 lakh) imposed by the platform | Amounts come from the law that applies, and a statute can cap them. The floors here are settings for a deployment to replace with figures the law supports. |
 | "Permanent suspect" labels | A label from unverified accusations is punishment without a finding and invites abuse. |
 | Requiring the accused to upload proof within a deadline or lose the case | Shifts the burden of proof onto the accused and pressures them toward self-incrimination and trial by social media. |
 | Emotion, remorse, heart-rate or eye-movement inference as grounds for any legal step | Scientifically unreliable; false positives would fall on frightened or neurodivergent people. |
@@ -114,5 +151,12 @@ pseudonymous references from the platform feed. The AI proposes roles; only an a
 - Which FIR-registration and preliminary-inquiry rules apply to AI-originated information under BNSS.
 - Admissibility of self-uploaded and public-interview confessions and how corroboration is recorded.
 - Data protection (DPDP Act 2023) basis for monitoring public content and storing evidence hashes.
-- Statutory prior-approval requirements before inquiries into public servants.
+- Statutory prior-approval requirements before inquiries into public servants (Prevention of Corruption Act, 1988
+  section 17A for inquiries into official decisions and section 19 for sanction to prosecute), and which service rules
+  govern each class of public servant for suspension, penalties and removal.
+- The legal basis and quantum for each civic violation (municipal bylaws, the Motor Vehicles Act, and for waste in a
+  river the Water Act as amended in 2024, where discharge now carries a monetary penalty imposed by an adjudicating
+  officer after a hearing). Whether a given violation is non-criminal is a legal question, not a platform setting.
+- Stable official identifiers: the review count joins sanctions by a pseudonymous reference, so it needs a reference
+  that stays the same across cases and that an identity system supplies.
 - Retention, redaction and correction rules that coexist with an append-only ledger.

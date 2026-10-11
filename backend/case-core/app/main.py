@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .config import get_settings
 from .db import init_db, make_engine, make_session_factory
-from .domain import ACTION_PARAMS, ACTIONS, KNOWN_CHECKS, Actor, PolicyViolation, Role
+from .domain import ACTION_PARAMS, ACTIONS, KNOWN_CHECKS, REVIEW_THRESHOLDS, SANCTION_KINDS, Actor, PolicyViolation, Role
 from .ledger import Ledger
-from .models import Case, CaseItem, CaseParty, LedgerEntry
+from .models import Case, CaseItem, CaseParty, CasePenalty, LedgerEntry
 from .schemas import ActionIn, AdvisoryIn, AlertIn, ComplaintIn, ContextFindingIn, PartiesIn, PublicResponseIn, ResponseIn
 from .service import CaseService
 
@@ -85,11 +85,18 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
             "determination": p.determination, "determined_note": p.determined_note,
         }
 
+    def penalty_out(p: CasePenalty) -> dict:
+        return {
+            "id": p.id, "party_ref": p.party_ref, "party_role": p.party_role, "kind": p.kind, "amount_inr": p.amount_inr,
+            "legal_basis": p.legal_basis, "issued_by": p.issued_by, "issued_at": p.issued_at,
+            "revoked": p.revoked, "revoked_by": p.revoked_by, "revoked_note": p.revoked_note,
+        }
+
     def case_out(c: Case, actor: Actor) -> dict:
         findings = [i for i in c.items if i.kind == "context_finding"]
         out = {
             "id": c.id, "kind": c.kind, "category": c.category, "title": c.title, "summary": c.summary,
-            "priority": c.priority, "confidence": c.confidence, "stage": c.stage, "signals": c.signals,
+            "priority": c.priority, "confidence": c.confidence, "stage": c.stage, "track": c.track, "signals": c.signals,
             "behaviors": c.behaviors, "situation": c.situation, "scenario": c.scenario,
             "parties": [party_out(p) for p in c.parties], "content_fingerprint": c.content_fingerprint,
             "checks": c.checks, "referred_to_role": c.referred_to_role, "notice_served_at": c.notice_served_at,
@@ -102,12 +109,16 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
             "context_findings_undermining_flag": sum(1 for f in findings if f.outcome == "undermines_flag"),
             "created_at": c.created_at, "updated_at": c.updated_at,
             "items": [item_out(i) for i in c.items],
+            "penalties": [penalty_out(p) for p in c.penalties],
+            "reviews_due": c.reviews_due,
             # AI output is advisory and says so on every case.
             "ai_notice": "AI output is advisory. Registration, referral and closure are human decisions.",
         }
         if not actor.is_staff:
             out.pop("signals", None)  # internal model signals are for reviewers
             out.pop("parties", None)  # who is a victim or subject is for officers, never shown to the public
+            out.pop("penalties", None)  # who was fined or sanctioned is for staff
+            out.pop("reviews_due", None)
         # Only on the response to the action that served notice: the officer receives the full notice and the private
         # response link once. They are not stored and cannot be read again.
         if c.issued_response_token:
@@ -143,6 +154,8 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
                 for name, spec in ACTIONS.items()
             },
             "checks": sorted(KNOWN_CHECKS),
+            "sanction_kinds": sorted(SANCTION_KINDS),
+            "review_thresholds": {str(n): kind for n, kind in REVIEW_THRESHOLDS.items()},
         }
 
     @app.post("/alerts")
@@ -172,7 +185,8 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
 
     @app.post("/cases/{case_id}/actions")
     def act(case_id: str, body: ActionIn, actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)) -> dict:
-        extras = {k: getattr(body, k) for k in ("party_ref", "party_role", "determination", "legal_basis") if getattr(body, k)}
+        names = ("party_ref", "party_role", "determination", "legal_basis", "sanction_kind", "amount_inr", "penalty_id")
+        extras = {k: getattr(body, k) for k in names if getattr(body, k) is not None and getattr(body, k) != ""}
         return case_out(svc.act(actor, case_id, body.action, body.note, body.check, body.link_to, **extras), actor)
 
     @app.post("/cases/{case_id}/parties", status_code=201)
@@ -228,6 +242,15 @@ def create_app(session_factory: sessionmaker[Session] | None = None) -> FastAPI:
     def sweep(actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)) -> dict:
         breached = svc.sweep_deadlines(actor)
         return {"newly_breached": [c.id for c in breached]}
+
+    @app.get("/attention/reviews-due")
+    def reviews_due(actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)) -> dict:
+        if actor.role not in (Role.SUPERVISORY_AUTHORITY, Role.JUDICIAL_AUTHORITY, Role.AUDITOR):
+            raise PolicyViolation("forbidden", "For supervisory and judicial authorities and auditors", 403)
+        return {
+            "note": "A count of recorded sanctions asked for these reviews. Only a human authority decides; the count suspends, removes and fines no one.",
+            "cases": [case_out(c, actor) for c in svc.reviews_due_cases()],
+        }
 
     @app.get("/attention/dismissal-recommendations")
     def dismissal_recommendations(actor: Actor = Depends(current_actor), svc: CaseService = Depends(service)) -> dict:

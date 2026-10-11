@@ -14,13 +14,22 @@ from .domain import (
     CONFESSION_GATED_ACTIONS,
     CONFESSION_REQUIRED_CHECKS,
     CONTEXT_GATED_ACTIONS,
+    COUNTED_SANCTIONS,
+    DEPARTMENTAL_REFERRAL_TARGET,
     DETERMINATIONS,
     FINDING_OUTCOMES,
+    HEARING_REQUIRED_SANCTIONS,
+    INQUIRY_REQUIRED_SANCTIONS,
     KNOWN_BEHAVIORS,
     KNOWN_SITUATIONS,
     OPTIONAL_FINDINGS,
     PARTY_ROLES,
+    REVIEW_THRESHOLDS,
+    SANCTION_KINDS,
+    SANCTION_ROLES,
     SCENARIOS,
+    TRACK_SCENARIO,
+    behavior_tracks,
     explain_subject_rule,
     KNOWN_CHECKS,
     REFERRAL_TARGET,
@@ -35,10 +44,11 @@ from .domain import (
     PUBLIC_OFFICIAL_TARGET,
     Role,
     Stage,
+    Track,
     decide_flag,
 )
 from .ledger import Ledger, iso, utcnow
-from .models import Case, CaseItem, CaseParty
+from .models import Case, CaseItem, CaseParty, CasePenalty
 from .notice import build_notice
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -47,6 +57,8 @@ CLOSED_STAGES = {Stage.CLOSED_NO_ACTION.value, Stage.CLOSED_BY_COURT.value}
 FROZEN_STAGES = CLOSED_STAGES | {Stage.LINKED.value}
 UNDECIDED = {s.value for s in UNDECIDED_STAGES}
 PRIORITIES = {"urgent", "high", "routine"}
+# Writes the automated entries that ask for a review. They inform; they never move a case.
+MONITOR = Actor(id="conduct-monitor", role=Role.SYSTEM)
 
 
 @dataclass(frozen=True)
@@ -101,6 +113,12 @@ class CaseService:
         unknown = set(behaviors) - KNOWN_BEHAVIORS
         if unknown:
             raise PolicyViolation("unknown_behavior", f"Unknown behaviours {sorted(unknown)}; allowed: {sorted(KNOWN_BEHAVIORS)}", 422)
+        if len(behavior_tracks(behaviors)) > 1:
+            raise PolicyViolation(
+                "mixed_tracks",
+                "Criminal, civic and departmental behaviours lead to different consequences. Raise one alert for each.",
+                422,
+            )
         if scenario not in SCENARIOS:
             raise PolicyViolation("unknown_scenario", f"scenario must be one of {sorted(SCENARIOS)}", 422)
         unknown_situation = set(situation) - KNOWN_SITUATIONS
@@ -117,17 +135,25 @@ class CaseService:
         # officials, are not flagged. The decision is still recorded (content fingerprint, behaviours and situation
         # only, no person) so auditors can see what the AI saw and dropped.
         decision = decide_flag(behaviors, situation)
+        track = decision.track
+        # A civic or departmental alert uses its own scenario. A criminal alert never does.
+        if scenario == "other":
+            scenario = TRACK_SCENARIO.get(track, "other")
+        elif scenario in TRACK_SCENARIO.values() and TRACK_SCENARIO.get(track) != scenario:
+            raise PolicyViolation(
+                "scenario_track_mismatch", f"The scenario '{scenario}' does not fit these behaviours (track '{track}')", 422
+            )
         if not decision.flag:
             self.ledger.append(
                 case_id=None, actor=actor, action="triage.no_flag",
                 payload={"content_fingerprint": content_fingerprint, "behaviors": sorted(behaviors),
-                         "situation": sorted(situation), "reason": decision.reason},
+                         "situation": sorted(situation), "track": track, "reason": decision.reason},
             )
             self.session.commit()
             return TriageResult("no_flag", None, decision.reason)
 
         # Same clip, same issue: add the information to the existing case. A second FIR is never opened.
-        existing = self._existing_for_fingerprint(content_fingerprint)
+        existing = self._existing_for_fingerprint(content_fingerprint, track)
         if existing is not None:
             self.ledger.append(
                 case_id=existing.id, actor=actor, action="alert.duplicate",
@@ -141,7 +167,7 @@ class CaseService:
             actor, CaseKind.SOCIAL, category, title, summary, confidence, priority, signals, evidence,
             subject_ids=[], complainant_id=None, affected_party_id=affected_party_id,
             behaviors=sorted(behaviors), situation=sorted(situation), scenario=scenario,
-            content_fingerprint=content_fingerprint,
+            content_fingerprint=content_fingerprint, track=track,
         )
         return TriageResult("flagged", case, decision.reason)
 
@@ -163,13 +189,15 @@ class CaseService:
             subject_ids=list(subject_ids), complainant_id=actor.id, affected_party_id=actor.id,
         )
 
-    def _existing_for_fingerprint(self, fingerprint: str) -> Case | None:
-        """An open case or an FIR already tracks this clip. A case closed with no action does not block fresh review,
-        and a court can lift the block for a clip with `permit_fresh_registration`."""
+    def _existing_for_fingerprint(self, fingerprint: str, track: str = Track.CRIMINAL.value) -> Case | None:
+        """An open case or an FIR already tracks this clip on this track. A case closed with no action does not block
+        fresh review, and a court can lift the block for a clip with `permit_fresh_registration`. The same clip can
+        have one case on each track (for example an offence and a departmental matter), but only one FIR."""
         query = (
             select(Case)
             .where(
                 Case.content_fingerprint == fingerprint,
+                Case.track == track,
                 Case.fresh_registration_permitted.is_(False),
                 Case.stage != Stage.CLOSED_NO_ACTION.value,
             )
@@ -187,6 +215,7 @@ class CaseService:
         priority: str, signals: Sequence[str], evidence: Sequence[dict], *, subject_ids: list[str],
         complainant_id: str | None, affected_party_id: str | None, behaviors: Sequence[str] = (),
         situation: Sequence[str] = (), scenario: str = "other", content_fingerprint: str | None = None,
+        track: str = Track.CRIMINAL.value,
     ) -> Case:
         if not title.strip() or not summary.strip():
             raise PolicyViolation("empty_text", "title and summary are required", 422)
@@ -199,7 +228,7 @@ class CaseService:
         case = Case(
             id=f"APN-{1001 + count}", kind=kind.value, category=category.value, title=title.strip(),
             summary=summary.strip(), priority=priority, confidence=confidence, stage=Stage.RECEIVED.value,
-            signals=list(signals), behaviors=list(behaviors), situation=list(situation), scenario=scenario,
+            track=track, reviews_due=[], signals=list(signals), behaviors=list(behaviors), situation=list(situation), scenario=scenario,
             content_fingerprint=content_fingerprint,
             subject_ids=subject_ids, complainant_id=complainant_id, affected_party_id=affected_party_id,
             checks=[], decision_due_at=due, created_at=now, updated_at=now,
@@ -217,7 +246,7 @@ class CaseService:
             )
         self.ledger.append(
             case_id=case.id, actor=actor, action="case.created",
-            payload={"to": Stage.RECEIVED.value, "kind": kind.value, "category": category.value,
+            payload={"to": Stage.RECEIVED.value, "kind": kind.value, "category": category.value, "track": track,
                      "behaviors": list(behaviors), "situation": list(situation), "scenario": scenario, "priority": priority, "confidence": confidence,
                      "content_fingerprint": content_fingerprint, "decision_due_at": due,
                      "evidence_hashes": [e.get("sha256") for e in evidence]},
@@ -237,19 +266,25 @@ class CaseService:
         if spec is None:
             raise PolicyViolation("unknown_action", f"Unknown action '{action}'", 400)
         note = (note or "").strip()
-        unknown = set(params) - {"party_ref", "party_role", "determination", "legal_basis"}
+        unknown = set(params) - {
+            "party_ref", "party_role", "determination", "legal_basis", "sanction_kind", "amount_inr", "penalty_id"
+        }
         if unknown:
             raise PolicyViolation("unknown_param", f"Unknown parameters {sorted(unknown)}", 422)
         target = self._authorize(actor, case, action, note, check, link_to, params)
 
         payload: dict = {"note": note} if note else {}
         now = iso(self.clock())
+        follow_ups: list[tuple[Actor, str, dict]] = []  # automated entries that inform; they never move a case
         if action == "record_check":
             if check not in case.checks:
                 case.checks = [*case.checks, check]
             payload["check"] = check
         elif action == "refer":
-            case.referred_to_role = REFERRAL_TARGET[CaseKind(case.kind)].value
+            target_role = (
+                DEPARTMENTAL_REFERRAL_TARGET if case.track == Track.DEPARTMENTAL.value else REFERRAL_TARGET[CaseKind(case.kind)]
+            )
+            case.referred_to_role = target_role.value
             payload["referred_to_role"] = case.referred_to_role
         elif action == "register_fir":
             case.fir_registered_at = now
@@ -285,6 +320,25 @@ class CaseService:
         elif action == "request_identification":
             # Recorded for accountability only. The platform never looks up, stores or messages contact details.
             payload.update(party_ref=params["party_ref"], legal_basis=(params.get("legal_basis") or "").strip())
+        elif action in ("issue_challan", "impose_sanction"):
+            penalty = self._record_penalty(actor, case, action, note, params, now)
+            payload.update(
+                penalty_id=penalty.id, party_ref=penalty.party_ref, party_role=penalty.party_role, kind=penalty.kind,
+                amount_inr=penalty.amount_inr, legal_basis=penalty.legal_basis, appealable=True,
+            )
+            if action == "impose_sanction":
+                follow_ups += self._review_triggers(case, penalty)
+        elif action == "revoke_penalty":
+            penalty = self._find_penalty(case, params.get("penalty_id"))
+            penalty.revoked, penalty.revoked_by, penalty.revoked_note, penalty.revoked_at = True, actor.id, note, now
+            self.session.flush()
+            payload.update(penalty_id=penalty.id, party_ref=penalty.party_ref, kind=penalty.kind)
+            follow_ups += self._withdraw_stale_reviews(penalty.party_ref)
+        elif action == "resolve_review":
+            ref = params.get("party_ref")
+            resolved = [r for r in case.reviews_due if r["party_ref"] == ref]
+            case.reviews_due = [r for r in case.reviews_due if r["party_ref"] != ref]
+            payload.update(party_ref=ref, resolved=[{"threshold": r["threshold"], "kind": r["kind"]} for r in resolved])
         elif action == "court_proceed":
             case.court_reviewed = True
         elif action == "appeal":
@@ -308,6 +362,8 @@ class CaseService:
             case.stage = spec.to_stage.value
         case.updated_at = now
         self.ledger.append(case_id=case.id, actor=actor, action=f"case.{action}", payload=payload)
+        for follow_actor, follow_action, follow_payload in follow_ups:
+            self.ledger.append(case_id=follow_payload.pop("case_id", case.id), actor=follow_actor, action=follow_action, payload=follow_payload)
         self.session.commit()
         return case
 
@@ -339,9 +395,19 @@ class CaseService:
         if spec.note_required and not note:
             raise PolicyViolation("note_required", f"'{action}' needs a written reason, recorded in the audit trail", 422)
 
+        if action in ("issue_challan", "impose_sanction"):
+            self._require_penalty_track(case, action)
         # Handlers: the referred-to authority acts on a referred case, never a different arm of the system.
-        if action in ("open_inquiry", "decline") and actor.role.value != case.referred_to_role:
+        if action in ("open_inquiry", "decline", "issue_challan", "impose_sanction") and actor.role.value != case.referred_to_role:
             raise PolicyViolation("wrong_handler", f"This case was referred to '{case.referred_to_role}'", 403)
+        if action == "register_fir" and case.track != Track.CRIMINAL.value:
+            raise PolicyViolation(
+                "not_a_criminal_matter",
+                f"This is a {case.track} matter, not an offence. No FIR can be registered on it.",
+                409,
+            )
+        if action == "serve_notice" and case.track == Track.CRIMINAL.value and case.stage != Stage.FIR_REGISTERED.value:
+            raise PolicyViolation("invalid_transition", f"Cannot 'serve_notice' while the case is '{case.stage}'", 409)
         if action == "register_fir" and case.kind == CaseKind.CONDUCT.value and case.stage != Stage.INQUIRY.value:
             raise PolicyViolation("inquiry_first", "Conduct complaints need a supervisory inquiry before an FIR decision", 409)
         if action == "record_check" and check not in KNOWN_CHECKS:
@@ -352,6 +418,13 @@ class CaseService:
             self._authorize_determination(case, params)
         if action == "request_identification":
             self._authorize_identification(case, params)
+        if action in ("issue_challan", "impose_sanction"):
+            self._authorize_penalty(case, action, params)
+        if action == "revoke_penalty":
+            self._find_penalty(case, params.get("penalty_id"), must_be_active=True)
+        if action == "resolve_review":
+            if case.track != Track.DEPARTMENTAL.value or not any(r["party_ref"] == params.get("party_ref") for r in case.reviews_due):
+                raise PolicyViolation("no_review_due", "No review is waiting for this party on this case", 409)
         if action == "register_fir" and case.scenario != "other" and not any(p.determination for p in case.parties):
             raise PolicyViolation(
                 "parties_undetermined",
@@ -412,6 +485,10 @@ class CaseService:
         return None
 
     def _authorize_notice(self, case: Case, party_ref: str | None) -> None:
+        if case.track != Track.CRIMINAL.value and not case.parties:
+            raise PolicyViolation(
+                "parties_required", "Parties must be proposed and determined before a notice on a civic or departmental matter", 409
+            )
         if case.parties:
             if not party_ref:
                 raise PolicyViolation("party_ref_required", "Name which subject this notice is for (party_ref)", 422)
@@ -459,6 +536,175 @@ class CaseService:
                 "A victim, witness or uninvolved person is never identified through this step.",
                 409,
             )
+
+
+    # ------------------------------------------------- challans, sanctions and the review a count asks for
+
+    @staticmethod
+    def _as_int(value: object, name: str) -> int | None:
+        if value in (None, ""):
+            return None
+        try:
+            number = int(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            raise PolicyViolation("bad_number", f"{name} must be a whole number", 422) from None
+        if number < 0:
+            raise PolicyViolation("bad_number", f"{name} cannot be negative", 422)
+        return number
+
+    @staticmethod
+    def _require_penalty_track(case: Case, action: str) -> None:
+        wanted = Track.CIVIC.value if action == "issue_challan" else Track.DEPARTMENTAL.value
+        if case.track != wanted:
+            noun = "Challans are for civic violations" if action == "issue_challan" else "Sanctions are for official misconduct"
+            raise PolicyViolation("wrong_track", f"{noun}. This is a {case.track} matter.", 409)
+
+    def _authorize_penalty(self, case: Case, action: str, params: dict) -> None:
+        """Both penalties are recorded by a named human, against one determined subject at a time, with a legal basis.
+        Whoever filmed or posted the clip is never a subject (see the scenario rules), so they are never penalised."""
+        ref = params.get("party_ref")
+        if not ref:
+            raise PolicyViolation("party_ref_required", "Name the person this is for (party_ref)", 422)
+        subject_roles = [p.role for p in case.parties if p.ref == ref and p.determination == "subject"]
+        if not subject_roles:
+            raise PolicyViolation(
+                "penalty_only_to_subjects",
+                "A challan or sanction goes only to a party an officer has determined to be a subject. Each person is "
+                "decided and recorded separately; a victim, a witness, an uninvolved person or whoever posted the clip never receives one.",
+                409,
+            )
+        if not (params.get("legal_basis") or "").strip():
+            raise PolicyViolation(
+                "legal_basis_required", "State the legal basis (the rule, bylaw, order or schedule) under which this is recorded", 422
+            )
+        amount = self._as_int(params.get("amount_inr"), "amount_inr")
+        if action == "issue_challan":
+            floor = self.settings.civic_challan_min_inr
+            if amount is None or amount < floor:
+                raise PolicyViolation(
+                    "amount_below_minimum", f"A challan needs an amount of at least {floor} rupees (a policy setting; the law's schedule governs)", 422
+                )
+            kind = "challan"
+        else:
+            kind = params.get("sanction_kind") or ""
+            if kind not in SANCTION_KINDS:
+                raise PolicyViolation("bad_sanction_kind", f"sanction_kind must be one of {sorted(SANCTION_KINDS)}", 422)
+            if not set(subject_roles) & SANCTION_ROLES[kind]:
+                raise PolicyViolation(
+                    "sanction_not_for_role",
+                    f"A {kind} can be recorded only against: {sorted(SANCTION_ROLES[kind])}. This party's role is {sorted(set(subject_roles))}.",
+                    409,
+                )
+            if kind == "fine":
+                floor = self.settings.departmental_fine_min_inr
+                if amount is None or amount < floor:
+                    raise PolicyViolation(
+                        "amount_below_minimum", f"A fine needs an amount of at least {floor} rupees (a policy setting; the law governing this person's service or contract applies)", 422
+                    )
+            elif amount is not None:
+                raise PolicyViolation("amount_not_allowed", f"A {kind} carries no amount", 422)
+            if kind in INQUIRY_REQUIRED_SANCTIONS and not any(
+                e.action == "case.open_inquiry" for e in self.ledger.entries(0, 500, case.id)
+            ):
+                raise PolicyViolation("inquiry_required", f"A {kind} follows an inquiry. Open one first.", 409)
+            if not any(i.kind == "notice" and i.label == ref for i in case.items):
+                raise PolicyViolation(
+                    "notice_required", "Serve this person a notice with the grounds, and let them respond, before recording a sanction.", 409
+                )
+            if kind in HEARING_REQUIRED_SANCTIONS and not self._party_heard(case, ref):
+                raise PolicyViolation(
+                    "hearing_pending",
+                    f"A {kind} needs the person to have been heard: wait until a response is on file or the response window has passed.",
+                    409,
+                )
+        if any(pn.party_ref == ref and pn.kind == kind and not pn.revoked for pn in case.penalties):
+            raise PolicyViolation("already_recorded", f"A {kind} is already recorded for this person on this case", 409)
+
+    def _party_heard(self, case: Case, party_ref: str) -> bool:
+        """The person has answered, or the response window on their own notice has passed. Silence is not an admission;
+        this only says they have had their chance."""
+        notice = next((i for i in case.items if i.kind == "notice" and i.label == party_ref), None)
+        if notice is None:
+            return False
+        who = f"link:{(notice.sha256 or '')[:8]}"
+        if any(i.kind == "response" and i.added_by == who for i in case.items):
+            return True
+        closes = datetime.fromisoformat(notice.added_at) + timedelta(days=self.settings.response_window_days)
+        return iso(self.clock()) >= iso(closes)
+
+    def _record_penalty(self, actor: Actor, case: Case, action: str, note: str, params: dict, now: str) -> CasePenalty:
+        ref = params["party_ref"]
+        kind = "challan" if action == "issue_challan" else params["sanction_kind"]
+        roles = [p.role for p in case.parties if p.ref == ref and p.determination == "subject"]
+        role = next((r for r in roles if kind == "challan" or r in SANCTION_ROLES[kind]), roles[0])
+        penalty = CasePenalty(
+            case=case, party_ref=ref, party_role=role, kind=kind, amount_inr=self._as_int(params.get("amount_inr"), "amount_inr"),
+            legal_basis=params["legal_basis"].strip(), note=note, issued_by=actor.id, issued_at=now,
+        )
+        self.session.add(penalty)
+        self.session.flush()
+        return penalty
+
+    def _find_penalty(self, case: Case, penalty_id: object, must_be_active: bool = False) -> CasePenalty:
+        number = self._as_int(penalty_id, "penalty_id")
+        penalty = next((pn for pn in case.penalties if pn.id == number), None)
+        if penalty is None:
+            raise PolicyViolation("penalty_not_found", "No such challan or sanction on this case", 422)
+        if must_be_active and penalty.revoked:
+            raise PolicyViolation("already_revoked", "This has already been revoked", 409)
+        return penalty
+
+    def active_sanction_count(self, party_ref: str) -> int:
+        """Recorded, unrevoked warnings and fines against this public servant on departmental cases. Challans and raw AI
+        flags are never counted. A count asks a human authority to review; it never acts."""
+        query = (
+            select(func.count())
+            .select_from(CasePenalty)
+            .join(Case, Case.id == CasePenalty.case_id)
+            .where(
+                Case.track == Track.DEPARTMENTAL.value,
+                CasePenalty.party_ref == party_ref,
+                CasePenalty.party_role == "public_servant",
+                CasePenalty.kind.in_(COUNTED_SANCTIONS),
+                CasePenalty.revoked.is_(False),
+            )
+        )
+        return self.session.execute(query).scalar_one()
+
+    def _review_triggers(self, case: Case, penalty: CasePenalty) -> list[tuple[Actor, str, dict]]:
+        if penalty.party_role != "public_servant" or penalty.kind not in COUNTED_SANCTIONS:
+            return []
+        count = self.active_sanction_count(penalty.party_ref)
+        review = REVIEW_THRESHOLDS.get(count)
+        if review is None:
+            return []
+        case.reviews_due = [*case.reviews_due, {"party_ref": penalty.party_ref, "threshold": count, "count": count, "kind": review}]
+        return [(
+            MONITOR, "conduct.review_due",
+            {"party_ref": penalty.party_ref, "count": count, "kind": review, "decided_by": "a human authority",
+             "binding": False, "note": "A count asks for a human review. It suspends, removes and fines no one."},
+        )]
+
+    def _withdraw_stale_reviews(self, party_ref: str) -> list[tuple[Actor, str, dict]]:
+        """After a revocation, a review that the count no longer supports is withdrawn."""
+        count = self.active_sanction_count(party_ref)
+        out: list[tuple[Actor, str, dict]] = []
+        pending = self.session.execute(select(Case).where(Case.track == Track.DEPARTMENTAL.value)).scalars()
+        for other in pending:
+            stale = [r for r in other.reviews_due if r["party_ref"] == party_ref and r["threshold"] > count]
+            if not stale:
+                continue
+            other.reviews_due = [r for r in other.reviews_due if r not in stale]
+            for r in stale:
+                out.append((
+                    MONITOR, "conduct.review_withdrawn",
+                    {"case_id": other.id, "party_ref": party_ref, "threshold": r["threshold"], "count_now": count},
+                ))
+        return out
+
+    def reviews_due_cases(self) -> list[Case]:
+        query = select(Case).where(Case.track == Track.DEPARTMENTAL.value, Case.stage == Stage.PENALTY_RECORDED.value)
+        return [c for c in self.session.execute(query.order_by(Case.id)).scalars() if c.reviews_due]
 
     # ------------------------------------- AI findings, advice and the right to respond
 

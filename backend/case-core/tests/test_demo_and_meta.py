@@ -18,7 +18,7 @@ from .conftest import AUDITOR, CITIZEN, REVIEWER, headers
 
 def test_seed_builds_every_guardrail_scenario_and_the_ledger_verifies(session, clock):
     ids = seed(session, clock)
-    assert len(ids) == 9
+    assert len(ids) == 11
     cases = {c.id: c for c in session.query(Case)}
     stages = {c.title: c.stage for c in cases.values()}
     assert stages["Reported threat of violence in a public video"] == "received"
@@ -28,9 +28,14 @@ def test_seed_builds_every_guardrail_scenario_and_the_ledger_verifies(session, c
     assert ncii.items[0].preview_withheld and ncii.items[0].sha256
     # The two scenario cases arrive at the officer with parties proposed and none decided.
     scenarios = {c.scenario: c for c in cases.values() if c.scenario != "other"}
-    assert set(scenarios) == {"intimate_imagery_without_consent", "public_indecent_act"}
+    assert set(scenarios) == {
+        "intimate_imagery_without_consent", "public_indecent_act", "civic_violation", "official_conduct",
+    }
     for c in scenarios.values():
-        assert c.stage == "referred" and len(c.parties) == 3 and all(p.determination is None for p in c.parties)
+        assert c.stage == "referred" and len(c.parties) >= 2 and all(p.determination is None for p in c.parties)
+    # The civic and departmental cases are not criminal: their track says so and the departmental one goes to a supervisor.
+    assert scenarios["civic_violation"].track == "civic" and scenarios["official_conduct"].track == "departmental"
+    assert scenarios["official_conduct"].referred_to_role == "supervisory_authority"
     assert sum(1 for e in Ledger(session).entries(limit=500) if e.action == "triage.no_flag") == 1
     svc = CaseService(session, clock)
     assert Ledger(session).verify().ok and svc.verify_projection() == []

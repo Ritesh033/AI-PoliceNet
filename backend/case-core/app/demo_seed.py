@@ -167,7 +167,37 @@ def seed(session: Session, clock: Callable[[], datetime] = utcnow) -> list[str]:
     ])
     refer(public_act)
 
-    # 10. An alert dropped by policy: casual profanity between friends. Recorded without any person.
+    # 10. A civic violation: parking that blocks a highway. Not a crime and not a flag. If an officer decides, each person
+    #     determined to be a subject can be issued a challan; an FIR can never be registered on it.
+    parking = alert(
+        category=Category.CIVIC, title="Car parked across a highway lane", confidence=0.9,
+        summary="A dashcam clip shows a car stopped across a highway lane, forcing traffic to swerve.",
+        content_fingerprint="fp-demo-0011", behaviors=["obstructive_parking"],
+        evidence=[{"label": "clip (sample)", "sha256": digest("parking-clip")}],
+    )
+    svc.propose_parties(AI, parking.id, [
+        {"ref": "veh:owner-41", "role": "vehicle_owner", "rationale": "registered owner of the vehicle in the clip"},
+        {"ref": "acct:poster-9", "role": "uploader", "rationale": "posted the dashcam clip; not involved"},
+    ])
+    refer(parking)
+
+    # 11. Official misconduct that is not an offence in itself: stopping vehicles and fining people without papers,
+    #     with private persons alongside. A departmental matter for the supervisory authority; no FIR can be registered.
+    misconduct = alert(
+        category=Category.OFFICIAL_MISCONDUCT, title="Vehicles stopped and fined without papers", confidence=0.82,
+        summary="A clip shows an official stopping vehicles and issuing fines without paperwork, with private persons helping.",
+        content_fingerprint="fp-demo-0012", behaviors=["abuse_of_official_power", "private_agents_in_official_acts"],
+        situation=["acting_in_official_capacity"],
+        evidence=[{"label": "clip (sample)", "sha256": digest("roadside-clip")}],
+    )
+    svc.propose_parties(AI, misconduct.id, [
+        {"ref": "emp:official-12", "role": "public_servant", "rationale": "stops vehicles and issues the fines"},
+        {"ref": "acct:helper-2", "role": "private_agent_of_official", "rationale": "stands with the official and collects payment"},
+        {"ref": "acct:poster-10", "role": "uploader", "rationale": "posted the clip; not involved"},
+    ])
+    refer(misconduct)
+
+    # 12. An alert dropped by policy: casual profanity between friends. Recorded without any person.
     svc.create_alert(
         AI, category=Category.HATE, title="Friends joking", summary="Banter", confidence=0.5,
         content_fingerprint="fp-demo-0008", behaviors=["casual_profanity"], situation=["friendly_banter"],

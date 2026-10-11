@@ -44,6 +44,9 @@ class ActionIn(BaseModel):
     party_role: str | None = None
     determination: str | None = None
     legal_basis: str | None = None
+    sanction_kind: str | None = None  # warning | fine | suspension | licence_cancellation | removal_order
+    amount_inr: int | None = Field(default=None, ge=0)
+    penalty_id: int | None = None
 
 
 class AdvisoryIn(BaseModel):

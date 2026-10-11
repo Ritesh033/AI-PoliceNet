@@ -63,6 +63,11 @@ What it shows, all enforced by the server and not by this page:
   in a public indecent act, the person who filmed or posted it), and refuses to send a notice to anyone but a decided subject.
 - **Notice package:** after an officer records a notice, the full notice text and the private no-login response link are
   shown once. The platform never sends messages or looks anyone up.
+- **Tracks:** every case shows its track. A civic case (parking across a road, spitting, urinating on a wall, waste in a
+  river) offers **Issue challan** and can never reach an FIR; a departmental case (official misconduct that is not an
+  offence in itself) goes to the supervisory authority and offers **Record sanction**, only after a notice. Each person is
+  decided and penalised separately. A count of recorded sanctions shows a **review request** and nothing else: it
+  suspends, removes and fines no one.
 - The hash-chained ledger and a **Verify ledger integrity** button, for auditors and judicial authorities.
 
 ## Design decisions that follow the product rules

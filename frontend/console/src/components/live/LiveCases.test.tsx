@@ -9,7 +9,7 @@ const NOW = Date.UTC(2026, 9, 10, 12, 0);
 function makeCase(over: Partial<ApiCase>): ApiCase {
   return {
     id: 'APN-1001', kind: 'social', category: 'threat', title: 'Reported threat in a public video',
-    summary: 'Spoken statements appear to threaten violence.', priority: 'urgent', confidence: 0.87, stage: 'received',
+    summary: 'Spoken statements appear to threaten violence.', priority: 'urgent', confidence: 0.87, stage: 'received', track: 'criminal',
     behaviors: ['threat'], situation: [], scenario: 'other', content_fingerprint: 'fp-demo-0001', checks: [], referred_to_role: null,
     notice_served_at: null, window_closes_at: null, response_received: false, court_reviewed: false, appeal_open: false,
     decision_due_at: new Date(NOW + 3 * 3600_000).toISOString(), sla_breached: false, linked_to: null,
@@ -35,7 +35,13 @@ const META = {
     serve_notice: { roles: ['authorized_officer'], from_stages: ['fir_registered'], to_stage: null, note_required: false, params: ['party_ref'] },
     court_close: { roles: ['judicial_authority'], from_stages: ['fir_registered'], to_stage: 'closed_by_court', note_required: true, params: [] },
     appeal: { roles: ['citizen'], from_stages: ['fir_registered'], to_stage: null, note_required: true, params: [] },
+    issue_challan: { roles: ['authorized_officer'], from_stages: ['referred', 'inquiry', 'penalty_recorded'], to_stage: 'penalty_recorded', note_required: true, params: ['party_ref', 'amount_inr', 'legal_basis'] },
+    impose_sanction: { roles: ['supervisory_authority'], from_stages: ['referred', 'inquiry', 'penalty_recorded'], to_stage: 'penalty_recorded', note_required: true, params: ['party_ref', 'sanction_kind', 'amount_inr', 'legal_basis'] },
+    revoke_penalty: { roles: ['judicial_authority', 'supervisory_authority'], from_stages: ['penalty_recorded'], to_stage: null, note_required: true, params: ['penalty_id'] },
+    resolve_review: { roles: ['supervisory_authority'], from_stages: ['penalty_recorded'], to_stage: null, note_required: true, params: ['party_ref'] },
   },
+  sanction_kinds: ['fine', 'licence_cancellation', 'removal_order', 'suspension', 'warning'],
+  review_thresholds: { '3': 'interim_suspension_review', '7': 'removal_inquiry_review' },
 };
 
 type Handler = (req: { url: string; method: string; headers: Record<string, string>; body: unknown }) => { status: number; body: unknown };
@@ -250,5 +256,87 @@ describe('LiveCases', () => {
     expect(detail).toHaveTextContent('/public/responses/TOKEN123');
     expect(within(detail).getByLabelText('Notice text')).toHaveTextContent('You do not need to log in.');
 
+  });
+
+  it('offers a challan, not a sanction, on a civic case and sends the amount as a number', async () => {
+    const civic = makeCase({
+      id: 'APN-1011', stage: 'referred', track: 'civic', category: 'civic', scenario: 'civic_violation',
+      behaviors: ['obstructive_parking'], context_missing: [],
+      parties: [
+        { ref: 'veh:owner-41', role: 'vehicle_owner', rationale: 'registered owner', proposed_by: 'model-v1', determination: 'subject', determined_note: 'owner' },
+        { ref: 'acct:poster-9', role: 'uploader', rationale: 'posted it', proposed_by: 'model-v1', determination: null, determined_note: null },
+      ],
+    });
+    const calls = installFetch(({ url, method, body }) => {
+      if (url === '/health') return { status: 200, body: { status: 'ok', auth: 'demo-stub' } };
+      if (url === '/meta/actions') return { status: 200, body: META };
+      if (url === '/cases') return { status: 200, body: [civic] };
+      if (url === '/cases/APN-1011/actions' && method === 'POST') {
+        if ((body as { amount_inr?: number }).amount_inr! < 10000) {
+          return { status: 422, body: { error: 'amount_below_minimum', detail: 'A challan needs an amount of at least 10000 rupees' } };
+        }
+        return { status: 200, body: { ...civic, stage: 'penalty_recorded' } };
+      }
+      return { status: 404, body: {} };
+    });
+    const user = userEvent.setup();
+    render(<LiveCases now={NOW} />);
+    await user.selectOptions(screen.getByLabelText('Act as'), 'authorized_officer');
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+    const detail = await screen.findByRole('region', { name: /APN-1011/ });
+    expect(detail).toHaveTextContent(/Civic track/);
+    expect(detail).toHaveTextContent(/not a crime/i);
+    expect(within(detail).getByRole('button', { name: 'Issue challan' })).toBeInTheDocument();
+    expect(within(detail).queryByRole('button', { name: 'Record sanction' })).not.toBeInTheDocument();
+
+    await user.click(within(detail).getByRole('button', { name: 'Issue challan' }));
+    await user.selectOptions(within(detail).getByLabelText('Party'), 'veh:owner-41');
+    await user.type(within(detail).getByLabelText(/amount in rupees/i), '500');
+    await user.type(within(detail).getByLabelText(/legal basis/i), 'Municipal bylaw schedule');
+    await user.type(within(detail).getByLabelText(/written reason/i), 'clip reviewed');
+    await user.click(within(detail).getByRole('button', { name: /submit: issue challan/i }));
+    expect(await within(detail).findByRole('alert')).toHaveTextContent('amount_below_minimum');
+
+    await user.clear(within(detail).getByLabelText(/amount in rupees/i));
+    await user.type(within(detail).getByLabelText(/amount in rupees/i), '12000');
+    await user.click(within(detail).getByRole('button', { name: /submit: issue challan/i }));
+    await waitFor(() => expect(within(detail).getByRole('status')).toHaveTextContent(/issue challan: recorded in the ledger/i));
+    const post = calls.filter((c) => c.method === 'POST').at(-1)!;
+    expect(post.body).toMatchObject({ action: 'issue_challan', party_ref: 'veh:owner-41', amount_inr: 12000, legal_basis: 'Municipal bylaw schedule' });
+  });
+
+  it('shows recorded sanctions and a review request, and says a count suspends no one', async () => {
+    const dept = makeCase({
+      id: 'APN-1012', stage: 'penalty_recorded', track: 'departmental', category: 'official_misconduct',
+      scenario: 'official_conduct', behaviors: ['abuse_of_official_power'], context_missing: [],
+      parties: [{ ref: 'emp:official-12', role: 'public_servant', rationale: '', proposed_by: 'model-v1', determination: 'subject', determined_note: 'stopped vehicles' }],
+      penalties: [
+        { id: 1, party_ref: 'emp:official-12', party_role: 'public_servant', kind: 'fine', amount_inr: 1000000, legal_basis: 'Service rules, rule 3', issued_by: 'sup-demo', issued_at: new Date(NOW).toISOString(), revoked: false, revoked_by: null, revoked_note: null },
+      ],
+      reviews_due: [{ party_ref: 'emp:official-12', threshold: 3, count: 3, kind: 'interim_suspension_review' }],
+    });
+    installFetch(({ url }) => {
+      if (url === '/health') return { status: 200, body: { status: 'ok', auth: 'demo-stub' } };
+      if (url === '/meta/actions') return { status: 200, body: META };
+      if (url === '/cases') return { status: 200, body: [dept] };
+      return { status: 404, body: {} };
+    });
+    const user = userEvent.setup();
+    render(<LiveCases now={NOW} />);
+    await user.selectOptions(screen.getByLabelText('Act as'), 'supervisory_authority');
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+    const detail = await screen.findByRole('region', { name: /APN-1012/ });
+    expect(detail).toHaveTextContent(/Departmental track/);
+    const note = within(detail).getByRole('note');
+    expect(note).toHaveTextContent(/asked to review/i);
+    expect(note).toHaveTextContent(/emp:official-12 has 3 recorded sanctions/);
+    expect(note).toHaveTextContent(/suspends, removes and fines no one/);
+    const list = within(detail).getByRole('list', { name: 'Challans and sanctions' });
+    expect(list).toHaveTextContent(/Fine/);
+    expect(list).toHaveTextContent('₹10,00,000');
+    expect(within(detail).getByRole('button', { name: 'Record sanction' })).toBeInTheDocument();
+    expect(within(detail).getByRole('button', { name: 'Answer a review request' })).toBeInTheDocument();
+    expect(within(detail).getByRole('button', { name: 'Revoke a challan or sanction' })).toBeInTheDocument();
+    expect(within(detail).queryByRole('button', { name: 'Issue challan' })).not.toBeInTheDocument();
   });
 });

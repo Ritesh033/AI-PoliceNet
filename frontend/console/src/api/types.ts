@@ -17,7 +17,32 @@ export type ApiStage =
   | 'fir_registered'
   | 'closed_no_action'
   | 'closed_by_court'
-  | 'linked';
+  | 'linked'
+  | 'penalty_recorded';
+
+/** What kind of consequence a case can lead to. Only a criminal case can lead to an FIR. */
+export type ApiTrack = 'criminal' | 'civic' | 'departmental';
+
+export interface ApiPenalty {
+  id: number;
+  party_ref: string;
+  party_role: string;
+  kind: 'challan' | 'warning' | 'fine' | 'suspension' | 'licence_cancellation' | 'removal_order';
+  amount_inr: number | null;
+  legal_basis: string;
+  issued_by: string;
+  issued_at: string;
+  revoked: boolean;
+  revoked_by: string | null;
+  revoked_note: string | null;
+}
+
+export interface ApiReview {
+  party_ref: string;
+  threshold: number;
+  count: number;
+  kind: string;
+}
 
 export interface ApiItem {
   id: number;
@@ -50,6 +75,7 @@ export interface ApiCase {
   priority: 'urgent' | 'high' | 'routine';
   confidence: number;
   stage: ApiStage;
+  track: ApiTrack;
   signals?: string[];
   behaviors: string[];
   situation: string[];
@@ -73,6 +99,10 @@ export interface ApiCase {
   created_at: string;
   updated_at: string;
   items: ApiItem[];
+  /** Staff only: challans and sanctions that a named human authority recorded. */
+  penalties?: ApiPenalty[];
+  /** Staff only: reviews that a count of recorded sanctions asked a human authority for. */
+  reviews_due?: ApiReview[];
   ai_notice: string;
   /** Present only on the response to the action that served notice. Shown once, never stored. */
   issued_response_token?: string;
@@ -90,6 +120,8 @@ export interface ActionSpec {
 export interface ActionMeta {
   actions: Record<string, ActionSpec>;
   checks: string[];
+  sanction_kinds?: string[];
+  review_thresholds?: Record<string, string>;
 }
 
 export interface LedgerRow {
@@ -122,4 +154,7 @@ export interface ActionRequest {
   party_role?: string;
   determination?: string;
   legal_basis?: string;
+  sanction_kind?: string;
+  amount_inr?: number;
+  penalty_id?: number;
 }

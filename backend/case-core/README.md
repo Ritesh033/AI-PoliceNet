@@ -12,15 +12,18 @@ and a **tamper-evident ledger** that records every step.
 cd backend/case-core
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
-python -m pytest -q                                   # 151 tests
-APN_ENV=demo APN_CHECKPOINT_KEY=change-me python -m app.demo_seed      # optional: 9 invented sample cases
+python -m pytest -q                                   # 202 tests
+APN_ENV=demo APN_CHECKPOINT_KEY=change-me python -m app.demo_seed      # optional: 11 invented sample cases
 APN_ENV=demo APN_CHECKPOINT_KEY=change-me APN_CORS_ORIGINS=http://localhost:3100 uvicorn app.main:app --port 8100
 # interactive docs: http://localhost:8100/docs
 ```
 
 Environment: `APN_ENV` (must be `demo`), `DATABASE_URL` (default SQLite file), `APN_RESPONSE_WINDOW_DAYS`
 (default 10), `APN_DECISION_SLA_HOURS` (default 24), `APN_CHECKPOINT_KEY` (signs ledger checkpoints),
-`APN_CORS_ORIGINS` (comma-separated browser origins allowed to call the API, such as the console; none by default).
+`APN_CORS_ORIGINS` (comma-separated browser origins allowed to call the API, such as the console; none by default),
+`APN_CIVIC_CHALLAN_MIN_INR` (default 10000) and `APN_DEPARTMENTAL_FINE_MIN_INR` (default 1000000). The last two are
+**policy settings, not law**: a challan or a fine must come from the statute, rule or schedule that applies, so a
+deployment has to replace them with figures the law supports (0 leaves the amount to the issuing authority).
 
 Demo auth: send `X-Actor-Id` and `X-Actor-Role` (`ai_service`, `system` (scheduler), `reviewer`,
 `authorized_officer`, `supervisory_authority`, `judicial_authority`, `citizen`, `auditor`).
@@ -31,7 +34,20 @@ Demo auth: send `X-Actor-Id` and `X-Actor-Role` (`ai_service`, `system` (schedul
 received -> in_review -> referred -> inquiry -> fir_registered -> closed_by_court
                 \-> closed_no_action  (reviewer, officer or supervisory authority; always with a written reason)
                 \-> linked           (related clip merged into an existing case as supplementary information)
+                \-> penalty_recorded (a human issued a challan, or a competent authority recorded a sanction)
 ```
+
+Every case is on one **track**, fixed when it opens. Only a `criminal` case can reach `fir_registered`.
+
+| Track | What it is | What can follow | Never |
+| --- | --- | --- | --- |
+| `criminal` | An offence (threat, bribe demand, beating, intimate imagery without consent, ...) | An FIR registered by an authorized officer | |
+| `civic` | Parking that blocks a road, spitting, urinating on a public wall, dumping waste in a river | `issue_challan` by an authorized officer, to each person decided to be a subject | An FIR; counted as a flag |
+| `departmental` | Official misconduct that is not an offence in itself (using power without papers or inquiry, private persons doing official work, official misbehaviour), only when the clip shows a person acting in an official capacity | `impose_sanction` by the supervisory authority, to each person decided to be a subject, after a notice (and a hearing for a fine, licence cancellation or removal) | An FIR; a sanction by software |
+
+A count of recorded warnings and fines against the same public servant asks a supervisory authority for a written
+review at 3 (`interim_suspension_review`) and at 7 (`removal_inquiry_review`). The count suspends, removes and fines
+no one, restricts no court, and falls when a sanction is revoked. See `docs/legal-compliance/design-guardrails.md`.
 
 | Endpoint | Who | What |
 | --- | --- | --- |
@@ -40,11 +56,12 @@ received -> in_review -> referred -> inquiry -> fir_registered -> closed_by_cour
 | `POST /public/responses/{token}` | Anyone holding the case's private link (no login) | Upload the full original video or any other material from any account. A human reads it. Also works when staff auth is not configured. |
 | `POST /cases/{id}/context-findings` | AI service | Full-context research: `media_source` (film, show, skit), `edit_detection`, `full_context`, `cross_platform_copies`. Referral is blocked until all four exist and a human records `record_check: context`. |
 | `POST /complaints` | Citizen | File a conduct complaint naming the official or office. |
-| `POST /cases/{id}/actions` | Humans, by role | `assign`, `record_check`, `request_context`, `no_action`, `refer`, `open_inquiry`, `decline`, `register_fir`, `serve_notice`, `determine_party`, `request_identification`, `court_proceed`, `court_close`, `permit_fresh_registration`, `link_supplementary`, `appeal`, `resolve_appeal` |
+| `POST /cases/{id}/actions` | Humans, by role | `assign`, `record_check`, `request_context`, `no_action`, `refer`, `open_inquiry`, `decline`, `register_fir`, `serve_notice`, `determine_party`, `request_identification`, `court_proceed`, `court_close`, `permit_fresh_registration`, `link_supplementary`, `issue_challan`, `impose_sanction`, `revoke_penalty`, `resolve_review`, `appeal`, `resolve_appeal` |
 | `POST /cases/{id}/advisory` | AI service | Attach a recommendation (`kind`: `info` or `dismissal`). Recorded as non-binding; never moves a case. A `dismissal` advisory puts an FIR in the court's queue. |
 | `POST /cases/{id}/responses` | A party | Submit counter-material. Always accepted while the matter is open; late ones are marked late. |
 | `GET /attention/window-elapsed` | Staff | Cases whose response window passed. Asks a human to follow up; changes nothing. |
 | `POST /attention/sweep`, `GET /attention/overdue-decisions` | Scheduler, staff | Records once that a case missed its 24-hour human-decision deadline and must go to a supervisor. Files nothing. |
+| `GET /attention/reviews-due` | Supervisory authority, judicial authority, auditor | Cases where a count of recorded sanctions asked for a human review. Informational: nothing is suspended or removed by the count. |
 | `GET /attention/dismissal-recommendations` | Judicial authority, auditor | FIRs where the AI's continuing research recommends dismissal. Only a court can act. |
 | `GET /ledger`, `/ledger/verify`, `/ledger/checkpoint` | Auditor, judicial authority | Read, verify and sign the audit chain. |
 | `GET /meta/actions` | Any identity | The workflow rules (roles, stages, required notes and inputs) straight from the code that enforces them, so clients never keep a drifting copy. |
@@ -77,6 +94,11 @@ received -> in_review -> referred -> inquiry -> fir_registered -> closed_by_cour
 | Respond with no login via a private link; the link is shown once and only its hash is stored | `service.submit_response_by_token` | `test_anyone_holding_the_link_can_respond_from_any_account_without_identifying_themselves`, `test_the_response_link_is_shown_once_and_only_its_hash_is_stored` |
 | Identification is a recorded officer step with a legal basis, never for a victim | `service._authorize_identification` | `test_identification_is_a_recorded_officer_step_with_a_legal_basis_and_never_for_a_victim` |
 | No place to store a name, phone, email or address, and nothing is ever sent | `models`, whole `app/` package | `test_the_schema_has_no_place_to_store_a_name_phone_number_email_or_address`, `test_the_service_never_sends_anything_or_calls_out` |
+| A civic violation or official misconduct that is not an offence can never reach an FIR | `service._authorize` | `test_no_fir_can_ever_be_registered_on_a_civic_or_departmental_matter` |
+| A challan or sanction goes only to a determined subject, one person at a time, recorded by a named human with a legal basis; whoever posted the clip is never penalised | `service._authorize_penalty` | `test_a_challan_goes_to_the_person_determined_to_be_the_subject_never_to_whoever_posted_the_clip`, `test_each_person_is_challaned_separately_and_only_once`, `test_a_sanction_needs_a_determined_subject_a_notice_and_a_human_authority` |
+| A fine, licence cancellation or removal needs the person to have been heard; a removal follows an inquiry; each sanction fits the person's role | `service._authorize_penalty` | `test_a_fine_needs_the_floor_and_a_hearing_and_other_sanctions_carry_no_amount`, `test_a_removal_order_follows_an_inquiry`, `test_each_sanction_fits_the_role_of_the_person_it_is_recorded_against` |
+| A count of sanctions only asks a human to review; it acts on no one and restricts no court | `service._review_triggers` | `test_the_third_recorded_sanction_asks_a_human_authority_for_a_review_and_does_nothing_else`, `test_the_seventh_asks_for_a_removal_inquiry_review_and_still_acts_on_no_one`, `test_no_count_restricts_any_court_even_after_seven_sanctions` |
+| Challans are not flags and are never counted; revoking a sanction lowers the count | `service.active_sanction_count` | `test_a_challan_is_not_a_flag_and_nothing_counts_it`, `test_revoking_a_sanction_lowers_the_count_and_withdraws_a_review_that_is_no_longer_supported` |
 | Sensitive media is hash-only and marked preview-withheld | `service._new_case` | `test_sensitive_evidence_stores_hash_only_and_marks_preview_withheld` |
 
 ## The ledger: tamper-evident, not tamper-proof

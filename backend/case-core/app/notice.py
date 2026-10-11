@@ -18,6 +18,15 @@ BEHAVIOR_TEXT = {
     "targeted_hate": "abuse aimed at a person or group for caste, religion or another protected trait",
     "self_admission": "a statement admitting an offence",
     "aggressive_abuse": "aggressive abuse",
+    "physical_assault": "physical violence",
+    "bribe_demand": "a demand for an illegal payment or favour by a public servant",
+    "obstructive_parking": "parking that blocks a road",
+    "public_spitting": "spitting in a public place",
+    "public_urination": "urinating on a public wall or in a public place",
+    "waste_dumping_in_water": "dumping waste in a river or other water body",
+    "abuse_of_official_power": "use of official power without the papers or inquiry that the rules require",
+    "private_agents_in_official_acts": "private persons acting alongside an official in official work",
+    "official_misbehavior": "improper conduct by a person acting in an official capacity",
 }
 
 OUTCOME_TEXT = {
@@ -34,6 +43,28 @@ CHECK_TEXT = {
 }
 
 
+def _meaning(track: str) -> tuple[str, str]:
+    """The decision that was taken and what it means for the person, by track."""
+    if track == "civic":
+        return (
+            "An authorized officer decided to consider a challan (a fine). A machine did not make that decision.",
+            "This is not a criminal matter and no FIR will be registered for it. A challan is a fine issued by an "
+            "authorized officer and you can contest it. You may send the full video or any other material first.",
+        )
+    if track == "departmental":
+        return (
+            "A competent authority is considering whether any action is needed. A machine did not make that decision.",
+            "This is a departmental or contractual matter, not a criminal case. A warning, fine, suspension or other "
+            "sanction can be recorded only by the competent authority, only after it has read your response, and you "
+            "can challenge it before a court.",
+        )
+    return (
+        "A human reviewer checked it, and an authorized officer decided to register an FIR. A machine did not make that decision.",
+        "An FIR starts an investigation. It is not a finding that you did anything wrong. You are presumed innocent, "
+        "and only a court can decide guilt.",
+    )
+
+
 def build_notice(case: Case, response_link: str, window_days: int) -> str:
     what = ", ".join(BEHAVIOR_TEXT.get(b, b.replace("_", " ")) for b in case.behaviors) or "a possible offence"
     clip = (case.content_fingerprint or "")[:12]
@@ -45,21 +76,22 @@ def build_notice(case: Case, response_link: str, window_days: int) -> str:
         f"  - {CHECK_TEXT[key]}: {OUTCOME_TEXT.get(outcome, outcome)}. {summary}"
         for key, (outcome, summary) in latest.items()
     )
+    track = getattr(case, "track", "criminal") or "criminal"
+    decision, means = _meaning(track)
     lines = [
         f"NOTICE ABOUT A CLIP (case {case.id})",
         "",
         "Why you are receiving this",
         f"A short video clip (reference {clip}) was flagged because it appeared to involve {what}. "
-        "An automated system only raised the flag. A human reviewer checked it, and an authorized officer decided to "
-        "register an FIR. A machine did not make that decision.",
+        f"An automated system only raised the flag. {decision}",
     ]
     if checks:
-        lines += ["", "What was checked before the officer decided", checks]
+        heading = "What was checked before the officer decided" if track == "criminal" else "What was checked first"
+        lines += ["", heading, checks]
     lines += [
         "",
         "What this means",
-        "An FIR starts an investigation. It is not a finding that you did anything wrong. You are presumed innocent, "
-        "and only a court can decide guilt.",
+        means,
         "",
         "How to respond (you do not need to log in)",
         "You can send the full, unedited video of the incident, or any other material, from any account or device. "
