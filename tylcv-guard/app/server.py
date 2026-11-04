@@ -10,11 +10,12 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-from . import db, risk, rotation, seqtools, stacking
+from . import calibrate, db, risk, rotation, seqtools, stacking
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 STATIC = os.path.join(ROOT, "static")
 EVIDENCE = os.path.join(ROOT, "data", "evidence.json")
+MODEL_PATH = os.environ.get("TYLCV_MODEL", os.path.join(ROOT, "data", "model_v2.json"))
 MAX_BODY = 5 * 1024 * 1024
 
 GAPS = [
@@ -76,6 +77,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"status": "ok"})
             if path == "/api/gaps":
                 return self._send(200, GAPS)
+            if path == "/api/model":
+                if not os.path.exists(MODEL_PATH):
+                    return self._send(200, {"trained": False})
+                m = calibrate.load(MODEL_PATH)
+                return self._send(200, {"trained": True, "n_rows": m["n_rows"]})
             if path == "/api/loci":
                 return self._send(200, stacking.LOCI)
             if path == "/api/evidence":
@@ -121,9 +127,26 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/rotation":
                 return self._send(200, rotation.plan(
                     list(body.get("available_groups", [])), list(body.get("history", [])),
-                    int(body.get("sprays", 6)), list(body.get("failed_groups", []))))
+                    int(body.get("sprays", 6)), list(body.get("failed_groups", [])),
+                    dict(body.get("efficacy", {}))))
+            if path == "/api/model/predict":
+                if not os.path.exists(MODEL_PATH):
+                    raise ValueError("model not trained yet: POST /api/model/train after logging 30+ trials")
+                x = {"temp_c": float(body["temp_c"]), "whitefly_per_leaf": float(body.get("whitefly_per_leaf", 0)),
+                     "stage": body.get("stage", "vegetative"), "loci": list(body.get("loci", [])),
+                     "exclusion": bool(body.get("exclusion", False)),
+                     "recombinant_pressure": bool(body.get("recombinant_pressure", False))}
+                prot = stacking.plan(x["loci"], x["temp_c"], x["recombinant_pressure"])["protection"]
+                v1 = risk.risk_index(x["temp_c"], x["whitefly_per_leaf"], x["stage"], prot, x["exclusion"])
+                return self._send(200, {"v2_incidence": round(calibrate.predict(calibrate.load(MODEL_PATH), x), 4),
+                                        "v1_index": v1["index"], "v1_category": v1["category"]})
             conn = db.connect()
             try:
+                if path == "/api/model/train":
+                    rows_ = db.training_rows(conn)
+                    m = calibrate.fit(rows_)  # raises ValueError (HTTP 400) when < 30 usable trials
+                    calibrate.save(m, MODEL_PATH)
+                    return self._send(200, {"trained": True, "n_rows": m["n_rows"]})
                 if path == "/api/refseqs":
                     db.add_reference(conn, body.get("name"), body.get("lineage", ""), body.get("sequence", ""))
                     return self._send(201, {"ok": True})

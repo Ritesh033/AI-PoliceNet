@@ -201,5 +201,87 @@ class API(unittest.TestCase):
         self.assertEqual(cm.exception.code, 400)
 
 
+class Calibrated(unittest.TestCase):
+    def synth(self, n, seed):
+        import math
+        r = random.Random(seed)
+        rows = []
+        for _ in range(n):
+            T = r.uniform(18, 36); wf = r.uniform(0, 8)
+            loci = [l for l in stacking.LOCI if r.random() < 0.4]
+            z = -2.5 + 0.35 * wf + 0.05 * (T - 25) - 1.2 * len(loci)
+            p = 1 / (1 + math.exp(-z))
+            k = sum(r.random() < p for _ in range(100))
+            rows.append({"temp_c": T, "whitefly_per_leaf": wf, "stage": "vegetative", "loci": loci,
+                         "exclusion": False, "recombinant_pressure": False, "plants": 100, "infected": k, "p": p})
+        return rows
+
+    def test_fit_learns_direction(self):
+        from app import calibrate
+        m = calibrate.fit(self.synth(600, 1))
+        base = {"temp_c": 28, "whitefly_per_leaf": 3, "stage": "vegetative", "exclusion": False, "recombinant_pressure": False}
+        none = calibrate.predict(m, {**base, "loci": []})
+        three = calibrate.predict(m, {**base, "loci": ["Ty-1/Ty-3", "Ty-2", "ty-5"]})
+        self.assertLess(three, none)
+        self.assertGreater(calibrate.predict(m, {**base, "loci": [], "whitefly_per_leaf": 8}), none)
+        test = self.synth(300, 2)
+        mae = sum(abs(calibrate.predict(m, t) - t["p"]) for t in test) / len(test)
+        self.assertLess(mae, 0.08)
+
+    def test_too_few_rows(self):
+        from app import calibrate
+        with self.assertRaises(ValueError):
+            calibrate.fit(self.synth(10, 3))
+
+    def test_efficacy_rotation(self):
+        r = rotation.plan(["4A", "28", "7C"], ["4A"], 3, efficacy={"28": 0.3, "7C": 0.75})
+        self.assertNotIn("28", [x["moa_group"] for x in r["plan"]])
+        r2 = rotation.plan(["4A", "28"], [], 2, efficacy={"4A": 0.2, "28": 0.3})
+        self.assertTrue(any("non-chemical" in w for w in r2["warnings"]))
+
+    def test_v2_screen(self):
+        rng = random.Random(4)
+        A = "".join(rng.choice("ACGT") for _ in range(2780))
+        B = list(A)
+        for i in range(len(B)):
+            if rng.random() < 0.04:
+                B[i] = rng.choice([c for c in "ACGT" if c != B[i]])
+        B = "".join(B)
+        chim = A[:1200] + B[1200:1500] + A[1500:]
+        self.assertTrue(seqtools.recombination_screen_v2(chim, {"A": A, "B": B})["flag"])
+        self.assertFalse(seqtools.recombination_screen_v2(A, {"A": A, "B": B})["flag"])
+
+
+class ModelAPI(unittest.TestCase):
+    call = API.call
+
+    @classmethod
+    def setUpClass(cls):
+        cls._old = db.DB_PATH
+        db.DB_PATH = os.path.join(tempfile.mkdtemp(), "model.db")  # isolated database
+        cls.srv = server.make_server(0)
+        cls.port = cls.srv.server_address[1]
+        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.srv.shutdown()
+        db.DB_PATH = cls._old
+
+    def test_train_flow(self):
+        from app import server as srv
+        srv.MODEL_PATH = os.path.join(tempfile.mkdtemp(), "m.json")
+        self.assertFalse(json.loads(self.call("/api/model")[1])["trained"])
+        self.assertEqual(self.call("/api/model/train", {})[0], 400)  # no data yet
+        r = random.Random(9)
+        for _ in range(40):
+            self.call("/api/trials", {"site": "s", "plants": 100, "infected": r.randint(0, 60), "mean_max_temp": r.uniform(20, 35),
+                                       "whitefly_per_leaf": r.uniform(0, 6), "stage": "vegetative", "loci": "Ty-2"})
+        s, b = self.call("/api/model/train", {})
+        self.assertEqual(s, 200, b)
+        s, b = self.call("/api/model/predict", {"temp_c": 28, "whitefly_per_leaf": 2, "loci": ["Ty-2"]})
+        self.assertEqual(s, 200); self.assertIn("v2_incidence", json.loads(b))
+
+
 if __name__ == "__main__":
     unittest.main()

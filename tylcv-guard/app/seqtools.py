@@ -116,3 +116,42 @@ def recombination_screen(query: str, refs: Dict[str, str], window: int = 200, st
     return {"flag": flag, "segments": solid,
             "reason": "windows best match different references" if flag else "single dominant reference",
             "note": "Screening only; confirm with RDP/phylogenetic recombination analysis."}
+
+
+def recombination_screen_v2(query: str, refs: Dict[str, str], window: int = 150, step: int = 30,
+                            k: int = 10, min_windows: int = 3, min_hits: int = 4,
+                            margin: float = 0.4) -> Dict:
+    """Recombination screen using only *discriminative* k-mers (present in some, not all, references).
+
+    Shared k-mers carry no information about which reference a window derives from, so
+    ignoring them sharpens the signal and permits shorter windows than the v1 screen.
+    """
+    if len(refs) < 2:
+        return {"flag": False, "reason": "need at least 2 references", "segments": []}
+    if len(query) < window + step:
+        return {"flag": False, "reason": "query too short for window screen", "segments": []}
+    ref_k = {n: circular_kmers(s, k) for n, s in refs.items()}
+    names = list(ref_k)
+    common = set.intersection(*ref_k.values())
+    informative = {n: ref_k[n] - common for n in names}
+    best = []
+    for start in range(0, len(query) - window + 1, step):
+        wk = kmers(query[start:start + window], k)
+        hits = sorted(((len(wk & informative[n]), n) for n in names), reverse=True)
+        (h1, n1), (h2, _n2) = hits[0], hits[1]
+        best.append((start, n1 if h1 >= min_hits and (h1 - h2) >= margin * h1 else None))
+    segments, cur = [], None
+    for start, name in best:
+        if name is None:
+            cur = None
+            continue
+        if cur and cur["ref"] == name:
+            cur["end"], cur["windows"] = start + window, cur["windows"] + 1
+        else:
+            cur = {"ref": name, "start": start, "end": start + window, "windows": 1}
+            segments.append(cur)
+    solid = [s for s in segments if s["windows"] >= min_windows]
+    flag = len({s["ref"] for s in solid}) >= 2
+    return {"flag": flag, "segments": solid,
+            "reason": "windows best match different references" if flag else "single dominant reference",
+            "note": "Screening only; confirm with RDP/phylogenetic recombination analysis."}

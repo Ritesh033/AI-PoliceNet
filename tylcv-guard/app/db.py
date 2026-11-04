@@ -38,6 +38,11 @@ def connect(path: str = None) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    existing = {r["name"] for r in conn.execute("PRAGMA table_info(trials)")}
+    for col, typ in (("whitefly_per_leaf", "REAL"), ("stage", "TEXT"), ("exclusion", "INTEGER"), ("recombinant", "INTEGER")):
+        if col not in existing:  # lightweight migration for databases created before v2
+            conn.execute(f"ALTER TABLE trials ADD COLUMN {col} {typ}")
+    conn.commit()
     return conn
 
 
@@ -121,11 +126,19 @@ def add_trial(conn, d: Dict) -> int:
         sev = None
     temp = d.get("mean_max_temp")
     temp = float(temp) if temp not in (None, "") else None
+    wf = d.get("whitefly_per_leaf")
+    wf = float(wf) if wf not in (None, "") else None
+    if wf is not None and wf < 0:
+        raise ValidationError("whitefly_per_leaf must be >= 0")
+    stage = d.get("stage") or None
+    if stage not in (None, "seedling", "vegetative", "flowering", "fruiting"):
+        raise ValidationError("stage must be seedling, vegetative, flowering or fruiting")
     cur = conn.execute(
-        "INSERT INTO trials(site,country,season,cultivar,loci,strain,mean_max_temp,plants,infected,severity,notes)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO trials(site,country,season,cultivar,loci,strain,mean_max_temp,plants,infected,severity,notes,"
+        "whitefly_per_leaf,stage,exclusion,recombinant) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (site, d.get("country", ""), d.get("season", ""), d.get("cultivar", ""), loci, d.get("strain", ""),
-         temp, plants, infected, sev, d.get("notes", "")))
+         temp, plants, infected, sev, d.get("notes", ""), wf, stage,
+         int(bool(d.get("exclusion"))), int(bool(d.get("recombinant")))))
     conn.commit()
     return cur.lastrowid
 
@@ -147,9 +160,21 @@ def trial_summary(conn) -> List[Dict]:
     return out
 
 
+def training_rows(conn) -> List[Dict]:
+    """Trials with the fields the calibrated model needs (temperature, whitefly density, stage)."""
+    out = []
+    for t in list_trials(conn):
+        if t["mean_max_temp"] is None or t["whitefly_per_leaf"] is None or not t["stage"]:
+            continue
+        out.append({"temp_c": t["mean_max_temp"], "whitefly_per_leaf": t["whitefly_per_leaf"], "stage": t["stage"],
+                    "loci": [x for x in (t["loci"] or "").split(",") if x], "exclusion": bool(t["exclusion"]),
+                    "recombinant_pressure": bool(t["recombinant"]), "plants": t["plants"], "infected": t["infected"]})
+    return out
+
+
 def trials_csv(conn) -> str:
     cols = ["id", "site", "country", "season", "cultivar", "loci", "strain", "mean_max_temp",
-            "plants", "infected", "severity", "notes"]
+            "whitefly_per_leaf", "stage", "exclusion", "recombinant", "plants", "infected", "severity", "notes"]
     lines = [",".join(cols)]
     for t in list_trials(conn):
         lines.append(",".join('"' + str(t[c] if t[c] is not None else "").replace('"', '""') + '"' for c in cols))

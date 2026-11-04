@@ -67,10 +67,20 @@ table{border-collapse:collapse;width:100%;font-size:13px;display:block;overflow-
 <div><label>Loci (e.g. Ty-1/Ty-3, Ty-2)</label><input id="t_loci"></div><div><label>Strain</label><input id="t_strain"></div>
 <div><label>Mean max temp (°C)</label><input id="t_temp" type="number"></div>
 <div><label>Plants*</label><input id="t_pl" type="number"></div><div><label>Infected*</label><input id="t_inf" type="number"></div>
-<div><label>Severity 0-4</label><input id="t_sev" type="number" step="0.1"></div></div>
+<div><label>Severity 0-4</label><input id="t_sev" type="number" step="0.1"></div>
+<div><label>Whitefly adults / leaf</label><input id="t_wf" type="number" step="0.1"></div>
+<div><label>Stage at exposure</label><select id="t_stage"><option value="">-</option><option>seedling</option><option>vegetative</option><option>flowering</option><option>fruiting</option></select></div>
+<div><label>Insect-proof exclusion</label><select id="t_ex"><option value="0">No</option><option value="1">Yes</option></select></div>
+<div><label>Recombinants present</label><select id="t_rc"><option value="0">No</option><option value="1">Yes</option></select></div></div>
 <button class="go" onclick="addTrial()">Save trial</button><span id="t_msg"></span>
 <h4>Incidence by locus combination (95% Wilson CI)</h4><div id="t_sum"></div>
-<p><a id="csv" href="/api/trials.csv">Download CSV</a></p></div></section>
+<p><a id="csv" href="/api/trials.csv">Download CSV</a></p></div>
+<div class="card"><h3>Calibrated model (v2)</h3><p class="note">Learns from logged trials that include temperature, whitefly density and stage (needs 30+). Benchmarks show it improves over the v1 heuristic as data accumulate.</p>
+<button class="go" onclick="trainModel()">Train from trials</button> <span id="m_msg"></span>
+<div class="row"><div><label>Temp °C</label><input id="m_t" type="number" value="30"></div><div><label>Whitefly/leaf</label><input id="m_w" type="number" value="3"></div>
+<div><label>Stage</label><select id="m_s"><option>vegetative</option><option>seedling</option><option>flowering</option><option>fruiting</option></select></div>
+<div><label>Loci (comma-separated)</label><input id="m_l" placeholder="Ty-1/Ty-3,Ty-2"></div></div>
+<button class="go" onclick="predictModel()">Predict (v1 vs v2)</button><div id="m_out"></div></div></section>
 
 <section id="seed"><div class="card"><h3>Seed lot register</h3><div class="row">
 <div><label>Lot*</label><input id="l_lot"></div><div><label>Origin</label><input id="l_or"></div>
@@ -111,8 +121,11 @@ async function doClassify(){try{const j=await api('/api/classify',{fasta:$('c_f'
  $('c_out').innerHTML=j.map(r=>`<div class="card"><b>${esc(r.name)}</b> · ${r.length} nt · GC ${r.gc}<br>${esc(r.classification.status)}: ${esc(r.classification.best_match||'-')} (score ${r.classification.score})<br>Recombination screen: <b>${r.recombination.flag?'FLAGGED':'not flagged'}</b> - ${esc(r.recombination.reason)}${r.recombination.segments.map(s=>`<br>• ${esc(s.ref)} ${s.start}-${s.end}`).join('')}${r.warnings.map(w=>`<br><span class="warn">⚠ ${esc(w)}</span>`).join('')}</div>`).join('');loadSv()}catch(e){err('c_out',e)}}
 async function loadSv(){try{const j=await api('/api/surveillance/summary');
  $('sv').innerHTML=`<table><tr><th>Country</th><th>Sequences</th><th>Recombinant flags</th></tr>${j.by_country.map(r=>`<tr><td>${esc(r.country)}</td><td>${r.n}</td><td>${r.recombinant_flags}</td></tr>`).join('')}</table>`}catch(e){err('sv',e)}}
-async function addTrial(){try{await api('/api/trials',{site:$('t_site').value,country:$('t_country').value,season:$('t_season').value,cultivar:$('t_cv').value,loci:$('t_loci').value,strain:$('t_strain').value,mean_max_temp:$('t_temp').value,plants:$('t_pl').value,infected:$('t_inf').value,severity:$('t_sev').value});$('t_msg').textContent=' Saved.';loadTrials()}catch(e){$('t_msg').innerHTML=` <span class="err">${esc(e.message)}</span>`}}
+async function addTrial(){try{await api('/api/trials',{site:$('t_site').value,country:$('t_country').value,season:$('t_season').value,cultivar:$('t_cv').value,loci:$('t_loci').value,strain:$('t_strain').value,mean_max_temp:$('t_temp').value,plants:$('t_pl').value,infected:$('t_inf').value,severity:$('t_sev').value,whitefly_per_leaf:$('t_wf').value,stage:$('t_stage').value,exclusion:$('t_ex').value==='1',recombinant:$('t_rc').value==='1'});$('t_msg').textContent=' Saved.';loadTrials()}catch(e){$('t_msg').innerHTML=` <span class="err">${esc(e.message)}</span>`}}
 async function loadTrials(){try{const j=await api('/api/trials/summary');$('t_sum').innerHTML=j.length?`<table><tr><th>Loci</th><th>Trials</th><th>Plants</th><th>Infected</th><th>Incidence</th><th>95% CI</th><th>Mean severity</th></tr>${j.map(r=>`<tr><td>${esc(r.loci)}</td><td>${r.trials}</td><td>${r.plants}</td><td>${r.infected}</td><td>${(r.incidence*100).toFixed(1)}%</td><td>${(r.ci95[0]*100).toFixed(1)}-${(r.ci95[1]*100).toFixed(1)}%</td><td>${r.mean_severity??'-'}</td></tr>`).join('')}</table>`:'<p class="note">No trials yet.</p>'}catch(e){err('t_sum',e)}}
+async function trainModel(){try{const j=await api('/api/model/train',{});$('m_msg').textContent=` Trained on ${j.n_rows} trials.`}catch(e){$('m_msg').innerHTML=` <span class="err">${esc(e.message)}</span>`}}
+async function predictModel(){try{const j=await api('/api/model/predict',{temp_c:+$('m_t').value,whitefly_per_leaf:+$('m_w').value,stage:$('m_s').value,loci:csv($('m_l').value)});
+ $('m_out').innerHTML=`<p>v2 predicted incidence <b>${(j.v2_incidence*100).toFixed(1)}%</b> · v1 index <b>${j.v1_index}</b> ${pill(j.v1_category)}</p>`}catch(e){err('m_out',e)}}
 async function addSeed(){try{await api('/api/seedlots',{lot:$('l_lot').value,origin:$('l_or').value,method:$('l_me').value,tested:+$('l_te').value,positive:+$('l_po').value,sample_size:$('l_sz').value});$('l_msg').textContent=' Saved.';loadSeeds()}catch(e){$('l_msg').innerHTML=` <span class="err">${esc(e.message)}</span>`}}
 async function loadSeeds(){try{const j=await api('/api/seedlots');$('l_list').innerHTML=j.length?`<table><tr><th>Lot</th><th>Origin</th><th>Method</th><th>Status</th><th>Upper 95% prevalence</th></tr>${j.map(r=>`<tr><td>${esc(r.lot)}</td><td>${esc(r.origin)}</td><td>${esc(r.method)}</td><td>${esc(r.status)}</td><td>${r.prevalence_upper95??'-'}</td></tr>`).join('')}</table>`:'<p class="note">No lots yet.</p>'}catch(e){err('l_list',e)}}
 let EV=[];async function loadEvid(){if(!EV.length){EV=await api('/api/evidence');const g=[...new Set(EV.map(e=>e.gap))].sort();$('e_f').innerHTML='<option value="">All</option>'+g.map(x=>`<option>${esc(x)}</option>`).join('')}showEvid()}

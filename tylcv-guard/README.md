@@ -10,7 +10,7 @@ are not validated against field data and it is not a substitute for expert or lo
 ```bash
 cd tylcv-guard
 python -m app.server --port 8080      # open http://127.0.0.1:8080
-python -m unittest discover -s tests -t .   # 22 tests
+python -m unittest discover -s tests -t .   # 27 tests
 ```
 
 Docker: `docker build -t tylcv-guard . && docker run -p 8080:8080 tylcv-guard`
@@ -27,10 +27,17 @@ Docker: `docker build -t tylcv-guard . && docker run -p 8080:8080 tylcv-guard`
 | G6 Uneven recombinant surveillance | Sequence Surveillance: user-supplied reference panel, k-mer classification, sliding-window recombination screen, per-country summary | `app/seqtools.py` |
 | G7 Whitefly insecticide resistance | IPM Rotation Planner: MoA rotation, no back-to-back repeats, excludes failed groups (no product or dose advice) | `app/rotation.py` |
 
+## Benchmark and v2 improvements
+
+`benchmark/` compares previous approaches, v1 and the calibrated v2 on simulated ground truth, with 15 figures (ROC/PR,
+reliability diagrams, heatmaps, box plots, learning curve, radar, ...). See `benchmark/README.md` for results **and** caveats.
+v2 additions: `app/calibrate.py` (model learned from logged trials; endpoints `/api/model`, `/api/model/train`,
+`/api/model/predict`), `recombination_screen_v2`, and an efficacy-adaptive `rotation.plan(..., efficacy={...})`.
+
 ## API (JSON)
 
 `GET /api/health | gaps | loci | evidence | refseqs | trials | trials/summary | trials.csv | seedlots | surveillance/summary`
-`POST /api/risk | risk/season | stacking | rotation | refseqs | classify | trials | seedlots`
+`POST /api/risk | risk/season | stacking | rotation | refseqs | classify | trials | seedlots | model/train | model/predict`  ·  `GET /api/model`
 
 ## Limitations (read before use)
 
