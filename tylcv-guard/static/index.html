@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TYLCV-Guard</title>
+<style>
+:root{--bg:#f6f8f5;--fg:#1d2a1f;--card:#fff;--ac:#2f6f3e;--mut:#5d6b5f;--bd:#d7ded6;--warn:#a15c00;--bad:#a12020}
+@media (prefers-color-scheme:dark){:root{--bg:#141a15;--fg:#e6ede6;--card:#1e271f;--ac:#6fc283;--mut:#9aa99c;--bd:#33403a;--warn:#e0a458;--bad:#ef7b7b}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+header{padding:14px 16px;border-bottom:1px solid var(--bd)}h1{margin:0;font-size:20px}header p{margin:2px 0 0;color:var(--mut);font-size:13px}
+nav{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px}nav button{border:1px solid var(--bd);background:var(--card);color:var(--fg);padding:6px 10px;border-radius:6px;cursor:pointer}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+main{padding:0 16px 40px;max-width:980px;margin:auto}section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:14px;margin:12px 0}
+label{display:block;margin:8px 0 2px;font-size:13px;color:var(--mut)}input,select,textarea{width:100%;padding:7px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit}
+textarea{min-height:110px;font-family:ui-monospace,monospace;font-size:12px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+button.go{margin-top:10px;background:var(--ac);color:#fff;border:0;padding:8px 14px;border-radius:6px;cursor:pointer}
+table{border-collapse:collapse;width:100%;font-size:13px;display:block;overflow-x:auto}td,th{border:1px solid var(--bd);padding:5px 8px;text-align:left}
+.pill{display:inline-block;padding:2px 10px;border-radius:12px;color:#fff;font-weight:600}
+.Low{background:#2f7d3e}.Moderate{background:#b58900}.High{background:#c26a00}.Very{background:#a12020}
+.note{color:var(--mut);font-size:12px}.err{color:var(--bad)}.warn{color:var(--warn)}
+</style></head><body>
+<header><h1>TYLCV-Guard</h1><p>Decision support and data platform for tomato yellow leaf curl virus. Heuristic advisory tool: not validated, not a substitute for expert or local guidance.</p></header>
+<nav id="nav"></nav>
+<main>
+<section id="overview"><div class="card"><h3>Research gaps and what addresses them</h3><table id="gaps"></table></div></section>
+
+<section id="risk"><div class="card"><h3>Climate &amp; vector risk index</h3>
+<div class="row"><div><label>Temperature (°C)</label><input id="r_t" type="number" value="28"></div>
+<div><label>Whitefly adults per leaf</label><input id="r_w" type="number" value="2" min="0" step="0.5"></div>
+<div><label>Crop stage</label><select id="r_s"><option>seedling</option><option selected>vegetative</option><option>flowering</option><option>fruiting</option></select></div>
+<div><label>Resistance protection (0-1)</label><input id="r_p" type="number" value="0" min="0" max="1" step="0.05"></div>
+<div><label>Insect-proof exclusion</label><select id="r_e"><option value="0">No</option><option value="1">Yes</option></select></div></div>
+<button class="go" onclick="doRisk()">Compute</button><div id="r_out"></div>
+<h4>Season series (CSV: date,temp_c,whitefly_per_leaf)</h4>
+<textarea id="r_csv">2026-03-01,18,0.5
+2026-03-02,24,1
+2026-03-03,29,3
+2026-03-04,33,4
+2026-03-05,38,2</textarea><button class="go" onclick="doSeason()">Compute series</button><div id="s_out"></div></div></section>
+
+<section id="stack"><div class="card"><h3>Resistance stacking planner</h3><div id="loci"></div>
+<div class="row"><div><label>Mean max temperature (°C)</label><input id="k_t" type="number" value="30"></div>
+<div><label>Virus</label><select id="k_v"><option>TYLCV</option><option>Other begomovirus</option></select></div>
+<div><label>Recombinant pressure</label><select id="k_r"><option value="0">No</option><option value="1">Yes</option></select></div></div>
+<button class="go" onclick="doStack()">Evaluate</button><div id="k_out"></div></div></section>
+
+<section id="ipm"><div class="card"><h3>Insecticide MoA rotation planner</h3>
+<label>Available MoA groups you can use (comma-separated, e.g. 4A, 28, 7C, 23, 29)</label><input id="i_a" value="4A,28,7C,23,29">
+<label>Spray history, oldest to newest</label><input id="i_h" value="4A">
+<label>Groups with reported control failure</label><input id="i_f" value="">
+<label>Number of sprays to plan</label><input id="i_n" type="number" value="6">
+<button class="go" onclick="doIpm()">Plan</button><div id="i_out"></div>
+<p class="note">Advisory only. Follow product labels and local regulations.</p></div></section>
+
+<section id="seq"><div class="card"><h3>Reference panel</h3>
+<p class="note">Add reference genomes you trust (e.g. from GenBank) before classifying.</p>
+<div class="row"><div><label>Name</label><input id="q_n"></div><div><label>Lineage</label><input id="q_l" placeholder="e.g. TYLCV-IL"></div></div>
+<label>Sequence</label><textarea id="q_s"></textarea><button class="go" onclick="addRef()">Add reference</button><div id="q_out"></div></div>
+<div class="card"><h3>Classify and screen sequences (FASTA)</h3>
+<div class="row"><div><label>Country</label><input id="c_c"></div><div><label>Collection date</label><input id="c_d" type="date"></div></div>
+<textarea id="c_f"></textarea><button class="go" onclick="doClassify()">Classify</button><div id="c_out"></div></div>
+<div class="card"><h3>Surveillance summary</h3><div id="sv"></div></div></section>
+
+<section id="trial"><div class="card"><h3>Log a field trial</h3><div class="row">
+<div><label>Site*</label><input id="t_site"></div><div><label>Country</label><input id="t_country"></div>
+<div><label>Season</label><input id="t_season"></div><div><label>Cultivar</label><input id="t_cv"></div>
+<div><label>Loci (e.g. Ty-1/Ty-3, Ty-2)</label><input id="t_loci"></div><div><label>Strain</label><input id="t_strain"></div>
+<div><label>Mean max temp (°C)</label><input id="t_temp" type="number"></div>
+<div><label>Plants*</label><input id="t_pl" type="number"></div><div><label>Infected*</label><input id="t_inf" type="number"></div>
+<div><label>Severity 0-4</label><input id="t_sev" type="number" step="0.1"></div></div>
+<button class="go" onclick="addTrial()">Save trial</button><span id="t_msg"></span>
+<h4>Incidence by locus combination (95% Wilson CI)</h4><div id="t_sum"></div>
+<p><a id="csv" href="/api/trials.csv">Download CSV</a></p></div></section>
+
+<section id="seed"><div class="card"><h3>Seed lot register</h3><div class="row">
+<div><label>Lot*</label><input id="l_lot"></div><div><label>Origin</label><input id="l_or"></div>
+<div><label>Method (PCR, qPCR…)</label><input id="l_me"></div><div><label>Tested?</label><select id="l_te"><option value="0">No</option><option value="1">Yes</option></select></div>
+<div><label>Positive samples</label><input id="l_po" type="number" value="0"></div><div><label>Sample size</label><input id="l_sz" type="number"></div></div>
+<button class="go" onclick="addSeed()">Save lot</button><span id="l_msg"></span><div id="l_list"></div></div></section>
+
+<section id="evid"><div class="card"><h3>Evidence library</h3>
+<label>Filter by gap</label><select id="e_f" onchange="showEvid()"></select><div id="e_list"></div>
+<p class="note">Entries come from the review paper. Verify each citation against the publisher record before relying on it.</p></div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(p,body){const o=body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{};
+ const r=await fetch(p,o);const j=await r.json();if(!r.ok)throw new Error(j.error||r.statusText);return j}
+const err=(el,e)=>$(el).innerHTML=`<p class="err">${esc(e.message)}</p>`;
+const tabs=[['overview','Gaps'],['risk','Risk'],['stack','Stacking'],['ipm','IPM'],['seq','Surveillance'],['trial','Field trials'],['seed','Seed lots'],['evid','Evidence']];
+$('nav').innerHTML=tabs.map(([i,l])=>`<button data-t="${i}">${l}</button>`).join('');
+$('nav').onclick=e=>{const t=e.target.dataset.t;if(!t)return;document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===t));
+ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+ if(t==='trial')loadTrials();if(t==='seed')loadSeeds();if(t==='seq')loadSv();if(t==='evid')loadEvid();};
+const pill=c=>`<span class="pill ${c.split(' ')[0]}">${esc(c)}</span>`;
+async function doRisk(){try{const j=await api('/api/risk',{temp_c:+$('r_t').value,whitefly_per_leaf:+$('r_w').value,stage:$('r_s').value,protection:+$('r_p').value,exclusion:$('r_e').value==='1'});
+ $('r_out').innerHTML=`<p>Index <b>${j.index}</b> ${pill(j.category)}</p><ul>${j.actions.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`}catch(e){err('r_out',e)}}
+async function doSeason(){try{const rows=$('r_csv').value.trim().split('\n').filter(Boolean).map(l=>{const [d,t,w]=l.split(',');return{date:d.trim(),temp_c:+t,whitefly_per_leaf:+(w||0)}});
+ const j=await api('/api/risk/season',{rows,stage:$('r_s').value,protection:+$('r_p').value,exclusion:$('r_e').value==='1'});
+ $('s_out').innerHTML=`<p>Mean ${j.summary.mean}, max ${j.summary.max}, high-risk days ${j.summary.high_risk_days}${j.summary.first_high_date?`, first on ${esc(j.summary.first_high_date)}`:''}</p><table><tr><th>Date</th><th>Index</th><th>Category</th></tr>${j.daily.map(d=>`<tr><td>${esc(d.date)}</td><td>${d.index}</td><td>${pill(d.category)}</td></tr>`).join('')}</table>`}catch(e){err('s_out',e)}}
+async function initStack(){const L=await api('/api/loci');$('loci').innerHTML=Object.entries(L).map(([k,v])=>`<label style="display:flex;gap:8px;align-items:center;color:var(--fg)"><input type="checkbox" style="width:auto" value="${esc(k)}">${esc(k)} <span class="note">${esc(v.mechanism)}</span></label>`).join('')}
+async function doStack(){try{const sel=[...document.querySelectorAll('#loci input:checked')].map(i=>i.value);
+ const j=await api('/api/stacking',{selected:sel,mean_max_temp_c:+$('k_t').value,virus:$('k_v').value==='TYLCV'?'TYLCV':'other',recombinant_pressure:$('k_r').value==='1'});
+ $('k_out').innerHTML=`<p>Protection score <b>${j.protection}</b> · Durability <b>${esc(j.durability)}</b></p>${j.warnings.map(w=>`<p class="warn">⚠ ${esc(w)}</p>`).join('')}<h4>Best additions</h4><table><tr><th>Locus</th><th>Gain</th><th>Durability then</th><th>Mechanism</th></tr>${j.recommendations.map(r=>`<tr><td>${esc(r.locus)}</td><td>+${r.gain}</td><td>${esc(r.new_durability)}</td><td>${esc(r.mechanism)}</td></tr>`).join('')}</table><p class="note">${esc(j.disclaimer)}</p>`}catch(e){err('k_out',e)}}
+const csv=s=>s.split(',').map(x=>x.trim()).filter(Boolean);
+async function doIpm(){try{const j=await api('/api/rotation',{available_groups:csv($('i_a').value),history:csv($('i_h').value),failed_groups:csv($('i_f').value),sprays:+$('i_n').value});
+ $('i_out').innerHTML=`<table><tr><th>Spray</th><th>MoA group</th></tr>${j.plan.map(p=>`<tr><td>${p.spray}</td><td>${esc(p.moa_group)}</td></tr>`).join('')}</table>${j.warnings.map(w=>`<p class="warn">⚠ ${esc(w)}</p>`).join('')}`}catch(e){err('i_out',e)}}
+async function addRef(){try{await api('/api/refseqs',{name:$('q_n').value,lineage:$('q_l').value,sequence:$('q_s').value});$('q_out').innerHTML='<p>Saved.</p>'}catch(e){err('q_out',e)}}
+async function doClassify(){try{const j=await api('/api/classify',{fasta:$('c_f').value,country:$('c_c').value,collected:$('c_d').value});
+ $('c_out').innerHTML=j.map(r=>`<div class="card"><b>${esc(r.name)}</b> · ${r.length} nt · GC ${r.gc}<br>${esc(r.classification.status)}: ${esc(r.classification.best_match||'-')} (score ${r.classification.score})<br>Recombination screen: <b>${r.recombination.flag?'FLAGGED':'not flagged'}</b> - ${esc(r.recombination.reason)}${r.recombination.segments.map(s=>`<br>• ${esc(s.ref)} ${s.start}-${s.end}`).join('')}${r.warnings.map(w=>`<br><span class="warn">⚠ ${esc(w)}</span>`).join('')}</div>`).join('');loadSv()}catch(e){err('c_out',e)}}
+async function loadSv(){try{const j=await api('/api/surveillance/summary');
+ $('sv').innerHTML=`<table><tr><th>Country</th><th>Sequences</th><th>Recombinant flags</th></tr>${j.by_country.map(r=>`<tr><td>${esc(r.country)}</td><td>${r.n}</td><td>${r.recombinant_flags}</td></tr>`).join('')}</table>`}catch(e){err('sv',e)}}
+async function addTrial(){try{await api('/api/trials',{site:$('t_site').value,country:$('t_country').value,season:$('t_season').value,cultivar:$('t_cv').value,loci:$('t_loci').value,strain:$('t_strain').value,mean_max_temp:$('t_temp').value,plants:$('t_pl').value,infected:$('t_inf').value,severity:$('t_sev').value});$('t_msg').textContent=' Saved.';loadTrials()}catch(e){$('t_msg').innerHTML=` <span class="err">${esc(e.message)}</span>`}}
+async function loadTrials(){try{const j=await api('/api/trials/summary');$('t_sum').innerHTML=j.length?`<table><tr><th>Loci</th><th>Trials</th><th>Plants</th><th>Infected</th><th>Incidence</th><th>95% CI</th><th>Mean severity</th></tr>${j.map(r=>`<tr><td>${esc(r.loci)}</td><td>${r.trials}</td><td>${r.plants}</td><td>${r.infected}</td><td>${(r.incidence*100).toFixed(1)}%</td><td>${(r.ci95[0]*100).toFixed(1)}-${(r.ci95[1]*100).toFixed(1)}%</td><td>${r.mean_severity??'-'}</td></tr>`).join('')}</table>`:'<p class="note">No trials yet.</p>'}catch(e){err('t_sum',e)}}
+async function addSeed(){try{await api('/api/seedlots',{lot:$('l_lot').value,origin:$('l_or').value,method:$('l_me').value,tested:+$('l_te').value,positive:+$('l_po').value,sample_size:$('l_sz').value});$('l_msg').textContent=' Saved.';loadSeeds()}catch(e){$('l_msg').innerHTML=` <span class="err">${esc(e.message)}</span>`}}
+async function loadSeeds(){try{const j=await api('/api/seedlots');$('l_list').innerHTML=j.length?`<table><tr><th>Lot</th><th>Origin</th><th>Method</th><th>Status</th><th>Upper 95% prevalence</th></tr>${j.map(r=>`<tr><td>${esc(r.lot)}</td><td>${esc(r.origin)}</td><td>${esc(r.method)}</td><td>${esc(r.status)}</td><td>${r.prevalence_upper95??'-'}</td></tr>`).join('')}</table>`:'<p class="note">No lots yet.</p>'}catch(e){err('l_list',e)}}
+let EV=[];async function loadEvid(){if(!EV.length){EV=await api('/api/evidence');const g=[...new Set(EV.map(e=>e.gap))].sort();$('e_f').innerHTML='<option value="">All</option>'+g.map(x=>`<option>${esc(x)}</option>`).join('')}showEvid()}
+function showEvid(){const f=$('e_f').value;$('e_list').innerHTML='<ol>'+EV.filter(e=>!f||e.gap===f).map(e=>`<li>${esc(e.citation)} <span class="note">[${esc(e.gap)}]</span></li>`).join('')+'</ol>'}
+(async()=>{try{const g=await api('/api/gaps');$('gaps').innerHTML='<tr><th>ID</th><th>Gap</th><th>Addressed by</th></tr>'+g.map(x=>`<tr><td>${x.id}</td><td>${esc(x.gap)}</td><td>${x.features.map(esc).join('<br>')}</td></tr>`).join('');await initStack()}catch(e){err('gaps',e)}
+ document.querySelector('nav button').click()})();
+</script></body></html>

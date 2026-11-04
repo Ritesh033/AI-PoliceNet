@@ -1,0 +1,242 @@
+[
+ {
+  "id": "prasad",
+  "gap": "G1",
+  "citation": "A. Prasad, N. Sharma, G. Hari-Gowthem, M. Muthamilarasan, and M. Prasad, “Tomato yellow leaf curl virus: Impact, challenges, and management,” Trends Plant Sci., vol. 25, no. 9, pp. 897–911, 2020.",
+  "verified": false
+ },
+ {
+  "id": "yan2021",
+  "gap": "G1",
+  "citation": "[Authors TBC], “The global dimension of tomato yellow leaf curl disease: Current status and breeding perspectives,” Microorganisms, vol. 9, no. 4, p. 740, 2021.",
+  "verified": false
+ },
+ {
+  "id": "zerbini",
+  "gap": "G6",
+  "citation": "F. M. Zerbini et al., “ICTV virus taxonomy profile: Geminiviridae,” J. Gen. Virol., vol. 98, no. 2, pp. 131–133, 2017.",
+  "verified": false
+ },
+ {
+  "id": "roumagnac",
+  "gap": "G6",
+  "citation": "P. Roumagnac et al., “Establishment of five new genera in the family Geminiviridae,” Arch. Virol., vol. 167, pp. 695–710, 2022.",
+  "verified": false
+ },
+ {
+  "id": "fiallo2023",
+  "gap": "G6",
+  "citation": "E. Fiallo-Olivé and J. Navas-Castillo, “Begomoviruses: What is the secret(s) of their success?” Trends Plant Sci., vol. 28, pp. 715–727, 2023.",
+  "verified": false
+ },
+ {
+  "id": "czosnek",
+  "gap": "G2",
+  "citation": "H. Czosnek, A. Hariton-Shalev, I. Sobol, R. Gorovits, and M. Ghanim, “The incredible journey of begomoviruses in their whitefly vector,” Viruses, vol. 9, no. 10, p. 273, 2017.",
+  "verified": false
+ },
+ {
+  "id": "fiallo2020",
+  "gap": "G2",
+  "citation": "E. Fiallo-Olivé, L.-L. Pan, S.-S. Liu, and J. Navas-Castillo, “Transmission of begomoviruses and other whitefly-borne viruses: Dependence on the vector species,” Phytopathology, vol. 110, no. 1, pp. 10–17, 2020.",
+  "verified": false
+ },
+ {
+  "id": "kil",
+  "gap": "G3",
+  "citation": "E.-J. Kil et al., “Tomato yellow leaf curl virus (TYLCV-IL): A seed-transmissible geminivirus in tomatoes,” Sci. Rep., vol. 6, Art. no. 19013, 2016.",
+  "verified": false
+ },
+ {
+  "id": "mabvakure",
+  "gap": "G6",
+  "citation": "B. Mabvakure et al., “Ongoing geographical spread of Tomato yellow leaf curl virus,” Virology, vol. 498, pp. 257–264, 2016.",
+  "verified": false
+ },
+ {
+  "id": "gorovits",
+  "gap": "G2",
+  "citation": "R. Gorovits and H. Czosnek, “The involvement of heat shock proteins in the establishment of tomato yellow leaf curl virus infection,” Front. Plant Sci., vol. 8, Art. no. 355, 2017.",
+  "verified": false
+ },
+ {
+  "id": "wang2017",
+  "gap": "G2",
+  "citation": "X.-W. Wang, P. Li, and S.-S. Liu, “Whitefly interactions with plants,” Curr. Opin. Insect Sci., vol. 19, pp. 70–75, 2017.",
+  "verified": false
+ },
+ {
+  "id": "xia",
+  "gap": "G2",
+  "citation": "J. Xia et al., “Whitefly hijacks a plant detoxification gene that neutralizes plant toxins,” Cell, vol. 184, no. 7, pp. 1693–1705, 2021.",
+  "verified": false
+ },
+ {
+  "id": "xu",
+  "gap": "G2",
+  "citation": "H.-X. Xu et al., “A salivary effector enables whitefly to feed on host plants by eliciting salicylic acid-signaling pathway,” Proc. Natl. Acad. Sci. U.S.A., vol. 116, no. 1, pp. 490–495, 2019.",
+  "verified": false
+ },
+ {
+  "id": "chen2016",
+  "gap": "G2",
+  "citation": "W. Chen et al., “The draft genome of whitefly Bemisia tabaci MEAM1, a global crop pest, provides novel insights into virus transmission, host adaptation, and insecticide resistance,” BMC Biol., vol. 14, Art. no. 110, 2016.",
+  "verified": false
+ },
+ {
+  "id": "yan2018",
+  "gap": "G1",
+  "citation": "Z. Yan et al., “Resistance to tomato yellow leaf curl virus in tomato germplasm,” Front. Plant Sci., vol. 9, Art. no. 1198, 2018.",
+  "verified": false
+ },
+ {
+  "id": "yamaguchi",
+  "gap": "G1",
+  "citation": "H. Yamaguchi et al., “An NB-LRR gene, TYNBS1, is responsible for resistance mediated by the Ty-2 begomovirus resistance locus of tomato,” Theor. Appl. Genet., vol. 131, pp. 1345–1362, 2018.",
+  "verified": false
+ },
+ {
+  "id": "gill",
+  "gap": "G1",
+  "citation": "U. Gill et al., “Ty-6, a major begomovirus resistance gene on chromosome 10, is effective against Tomato yellow leaf curl virus and Tomato mottle virus,” Theor. Appl. Genet., vol. 132, pp. 1543–1554, 2019.",
+  "verified": false
+ },
+ {
+  "id": "ty6_2024",
+  "gap": "G1",
+  "citation": "[Authors TBC], “[Title TBC: SlPOLD1 as the gene underlying Ty-6],” Theor. Appl. Genet., 2024, doi: 10.1007/s00122-024-04803-w.",
+  "verified": false
+ },
+ {
+  "id": "elsappah",
+  "gap": "G1",
+  "citation": "A. H. El-Sappah et al., “Natural resistance of tomato plants to tomato yellow leaf curl virus,” Front. Plant Sci., vol. 13, Art. no. 1081549, 2022.",
+  "verified": false
+ },
+ {
+  "id": "pramanik",
+  "gap": "G5",
+  "citation": "D. Pramanik et al., “CRISPR/Cas9-mediated generation of pathogen-resistant tomato against tomato yellow leaf curl virus and powdery mildew,” Int. J. Mol. Sci., vol. 22, no. 4, p. 1855, 2021.",
+  "verified": false
+ },
+ {
+  "id": "tashkandi",
+  "gap": "G5",
+  "citation": "M. Tashkandi, Z. Ali, F. Aljedaani, A. Shami, and M. M. Mahfouz, “Engineering resistance against Tomato yellow leaf curl virus via the CRISPR/Cas9 system in tomato,” Plant Signal. Behav., vol. 13, no. 10, e1525996, 2018.",
+  "verified": false
+ },
+ {
+  "id": "zaidi",
+  "gap": "G5",
+  "citation": "S. S.-e.-A. Zaidi, M. Tashkandi, S. Mansoor, and M. M. Mahfouz, “Engineering plant immunity: Using CRISPR/Cas9 to generate virus resistance,” Front. Plant Sci., vol. 7, Art. no. 1673, 2016.",
+  "verified": false
+ },
+ {
+  "id": "aman",
+  "gap": "G5",
+  "citation": "R. Aman et al., “RNA virus interference via CRISPR/Cas13a system in plants,” Genome Biol., vol. 19, Art. no. 1, 2018.",
+  "verified": false
+ },
+ {
+  "id": "mitter",
+  "gap": "G5",
+  "citation": "N. Mitter et al., “Clay nanosheets for topical delivery of RNAi for sustained protection against plant viruses,” Nat. Plants, vol. 3, Art. no. 16207, 2017.",
+  "verified": false
+ },
+ {
+  "id": "tabein",
+  "gap": "G5",
+  "citation": "S. Tabein et al., “[Title TBC: non-transgenic dsRNA vs. hairpin-RNA approaches against TYLCV-IL],” J. Plant Prot. (Shahid Chamran Univ. Ahvaz), 2022.",
+  "verified": false
+ },
+ {
+  "id": "marchant",
+  "gap": "G6",
+  "citation": "W. G. Marchant et al., “[Title TBC: global genomic analysis of TYLCV],” Front. Virol., vol. 3, Art. no. 1221156, 2023.",
+  "verified": false
+ },
+ {
+  "id": "moriones",
+  "gap": "G6",
+  "citation": "E. Moriones, S. Praveen, and S. Chakraborty, “Tomato leaf curl New Delhi virus: An emerging virus complex threatening vegetable and fiber crops,” Viruses, vol. 9, no. 10, p. 264, 2017.",
+  "verified": false
+ },
+ {
+  "id": "horowitz",
+  "gap": "G7",
+  "citation": "A. R. Horowitz, M. Ghanim, E. Roditakis, R. Nauen, and I. Ishaaya, “Insecticide resistance and its management in Bemisia tabaci species,” J. Pest Sci., vol. 93, pp. 893–910, 2020.",
+  "verified": false
+ },
+ {
+  "id": "insects2024",
+  "gap": "G7",
+  "citation": "[Authors TBC], “Insecticide resistance status and vector potential of Bemisia tabaci populations on vegetable crops in Türkiye,” Insects, vol. 15, no. 6, p. 438, 2024.",
+  "verified": false
+ },
+ {
+  "id": "rojas",
+  "gap": "G6",
+  "citation": "M. R. Rojas et al., “World management of geminiviruses,” Annu. Rev. Phytopathol., vol. 56, pp. 637–677, 2018.",
+  "verified": false
+ },
+ {
+  "id": "ali2016",
+  "gap": "G5",
+  "citation": "Z. Ali, S. Ali, M. Tashkandi, S. S.-e.-A. Zaidi, and M. M. Mahfouz, “CRISPR/Cas9-mediated immunity to geminiviruses: Differential interference and evasion,” Sci. Rep., vol. 6, Art. no. 26912, 2016.",
+  "verified": false
+ },
+ {
+  "id": "mahas",
+  "gap": "G5",
+  "citation": "A. Mahas and M. Mahfouz, “Engineering virus resistance via CRISPR–Cas systems,” Curr. Opin. Virol., vol. 32, pp. 1–8, 2018.",
+  "verified": false
+ },
+ {
+  "id": "xie2017",
+  "gap": "G2",
+  "citation": "W. Xie et al., “Genome sequencing of the sweetpotato whitefly Bemisia tabaci MED/Q,” GigaScience, vol. 6, no. 5, pp. 1–7, 2017.",
+  "verified": false
+ },
+ {
+  "id": "kanakala2019",
+  "gap": "G2",
+  "citation": "S. Kanakala and M. Ghanim, “Global genetic diversity and geographical distribution of Bemisia tabaci and its bacterial endosymbionts,” PLoS One, vol. 14, no. 3, e0213946, 2019.",
+  "verified": false
+ },
+ {
+  "id": "kanakala2016",
+  "gap": "G2",
+  "citation": "S. Kanakala and M. Ghanim, “Implication of the whitefly Bemisia tabaci cyclophilin B protein in the transmission of Tomato yellow leaf curl virus,” Front. Plant Sci., vol. 7, Art. no. 1702, 2016.",
+  "verified": false
+ },
+ {
+  "id": "pan2018",
+  "gap": "G2",
+  "citation": "L.-L. Pan, X.-Y. Cui, Q.-F. Chen, X.-W. Wang, and S.-S. Liu, “Cotton leaf curl disease: Which whitefly is the vector?” Phytopathology, vol. 108, no. 10, pp. 1172–1183, 2018.",
+  "verified": false
+ },
+ {
+  "id": "dangelo",
+  "gap": "G7",
+  "citation": "R. A. C. Dângelo, M. Michereff-Filho, M. R. Campos, P. S. da Silva, and R. N. C. Guedes, “Insecticide resistance and control failure likelihood of the whitefly Bemisia tabaci (MEAM1; B biotype): A Neotropical scenario,” Ann. Appl. Biol., vol. 172, no. 1, pp. 88–99, 2018.",
+  "verified": false
+ },
+ {
+  "id": "sani",
+  "gap": "G7",
+  "citation": "I. Sani, S. I. Ismail, S. Abdullah, J. Jalinas, S. Jamian, and N. Saad, “A review of the biology and control of whitefly, Bemisia tabaci, with special reference to biological control using entomopathogenic fungi,” Insects, vol. 11, no. 9, p. 619, 2020.",
+  "verified": false
+ },
+ {
+  "id": "fiallo2021",
+  "gap": "G6",
+  "citation": "E. Fiallo-Olivé et al., “ICTV virus taxonomy profile: Geminiviridae 2021,” J. Gen. Virol., vol. 102, no. 12, Art. no. 001696, 2021.",
+  "verified": false
+ },
+ {
+  "id": "skendzic",
+  "gap": "G4",
+  "citation": "S. Skendžić, M. Zovko, I. P. Živković, V. Lešić, and D. Lemić, “The impact of climate change on agricultural insect pests,” Insects, vol. 12, no. 5, p. 440, 2021.",
+  "verified": false
+ }
+]
