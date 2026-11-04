@@ -8,4 +8,7 @@ Yan 2021 *Microorganisms* (authors TBC); El-Sappah 2022 *Front Plant Sci*; Prama
 **Cited from memory (believed real; volume/page/author details need checking):**
 Prasad 2020; Zerbini 2017; Roumagnac 2022; Fiallo-Olivé & Navas-Castillo 2023; Czosnek 2017; Fiallo-Olivé 2020; Kil 2016; Mabvakure 2016 (full author list TBC); Gorovits & Czosnek 2017; Wang, Li & Liu 2017; Xia 2021; Xu 2019; Chen 2016; Yamaguchi 2018; Gill 2019; Tashkandi 2018; Zaidi 2016; Aman 2018; Mitter 2017; Moriones 2017; Horowitz 2020; Skendžić 2021.
 
+**Added in the 40-reference version (all cited from memory, verify):**
+Rojas 2018 (full author list TBC); Ali 2016; Mahas & Mahfouz 2018; Xie 2017; Kanakala & Ghanim 2019; Kanakala & Ghanim 2016; Pan 2018; Dângelo 2018; Sani 2020; Fiallo-Olivé 2021 (author list TBC).
+
 Entries still showing "[Authors TBC]" / "[Title TBC]" in the paper must be completed.
