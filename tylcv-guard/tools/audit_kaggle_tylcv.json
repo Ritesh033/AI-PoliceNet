@@ -1,0 +1,42 @@
+{
+ "n_images": 100,
+ "dimensions": {
+  "960x1280": 2,
+  "256x256": 91,
+  "3000x4000": 7
+ },
+ "sources": {
+  "timestamp filename (likely field photo)": 2,
+  "PlantVillage-style filename": 91,
+  "phone camera (IMG<date>)": 7
+ },
+ "exact_duplicates": [],
+ "near_duplicate_pairs": [
+  {
+   "a": "1723454502799.jpg",
+   "b": "IMG20240812111249.jpg",
+   "hamming": 7
+  },
+  {
+   "a": "1723454502881.jpg",
+   "b": "IMG20240812111244.jpg",
+   "hamming": 1
+  }
+ ],
+ "blur_variance": {
+  "median": 533.7760502788427,
+  "p10": 53.62853091193892,
+  "blurriest": [
+   "1dc30471-999e-4b74-a775-c85fc2c7ab89___UF.GRC_YLCV_Lab 02134.JPG",
+   "1ba3b050-8dfe-4ff9-aaa6-dff4f961e7ae___UF.GRC_YLCV_Lab 03009.JPG",
+   "1e02db5d-5674-4bfe-ac90-64fb69abfad1___UF.GRC_YLCV_Lab 02989.JPG",
+   "1c1f329f-d726-463f-8e54-a5ed2e7c9e87___UF.GRC_YLCV_Lab 03254.JPG",
+   "1b984071-0529-4e15-9157-0b4b4a214d8f___UF.GRC_YLCV_Lab 08574.JPG"
+  ]
+ },
+ "labels_present": false,
+ "notes": [
+  "Folder has images only: no labels, no healthy/negative class, so accuracy cannot be computed.",
+  "256x256 PlantVillage-style files may overlap with public datasets used to train other models (leakage risk)."
+ ]
+}
