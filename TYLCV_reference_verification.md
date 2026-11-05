@@ -39,3 +39,10 @@ cited in the report. As before, **none was checked against a bibliographic datab
 memory except the two dataset entries taken from the URLs you supplied. Verify every entry (authors, volume, pages, DOI) before
 submission. Placeholders in the report that you must fill: degree/programme, branch, institution and logo, supervisor and
 co-supervisor names/IDs, UID, examiner, viva date, and the plagiarism report (Annexure I).
+
+---
+
+# TYLCV_DL_Review_Paper_IEEE (40 references)
+
+Same 40 references as TYLCV_DL_review_IEEE (see that section above): written from memory, none checked against a bibliographic
+database; verify authors, volume, pages and DOI before submission.
