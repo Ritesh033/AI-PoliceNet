@@ -10,7 +10,7 @@ are not validated against field data and it is not a substitute for expert or lo
 ```bash
 cd tylcv-guard
 python -m app.server --port 8080      # open http://127.0.0.1:8080
-python -m unittest discover -s tests -t .   # 31 tests
+python -m unittest discover -s tests -t .   # 34 tests
 ```
 
 Docker: `docker build -t tylcv-guard . && docker run -p 8080:8080 tylcv-guard`
@@ -33,6 +33,12 @@ Docker: `docker build -t tylcv-guard . && docker run -p 8080:8080 tylcv-guard`
 reliability diagrams, heatmaps, box plots, learning curve, radar, ...). See `benchmark/README.md` for results **and** caveats.
 v2 additions: `app/calibrate.py` (model learned from logged trials; endpoints `/api/model`, `/api/model/train`,
 `/api/model/predict`), `recombination_screen_v2`, and an efficacy-adaptive `rotation.plan(..., efficacy={...})`.
+
+## Leaf-image deep learning (`dl/`)
+
+Transfer-learning classifier for TYLCV leaf photos (train/evaluate/Grad-CAM). **No trained model exists yet**: the data so far
+has no negatives. See `dl/README.md`. Set `TYLCV_LOCAL_MODEL=runs/exp1/model.pt` to make Leaf scan use a trained checkpoint
+instead of Roboflow.
 
 ## Leaf scan (optional Roboflow integration)
 

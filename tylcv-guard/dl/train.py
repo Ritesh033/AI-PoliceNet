@@ -94,6 +94,11 @@ def main(argv=None):
     split = D.group_split(items, seed=a.seed)
     counts = {k: {"n": len(v), "positives": sum(l for _p, l, _c in v)} for k, v in split.items()}
     print("split (duplicate-aware):", counts)
+    import collections
+    gs = collections.Counter(D.duplicate_groups([p for p, _l, _c in items]))
+    if max(gs.values()) > 0.2 * len(items):
+        print(f"WARNING: one near-duplicate group holds {max(gs.values())} of {len(items)} images; "
+              "splits will be unbalanced (check for repeated/very similar images)")
     for k, v in counts.items():
         if v["n"] == 0 or v["positives"] in (0, v["n"]):
             raise SystemExit(f"split '{k}' lacks one of the classes {v}: need both tylcv and not_tylcv images "

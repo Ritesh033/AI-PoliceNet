@@ -33,25 +33,20 @@ def scan_folder(root: str, positive: Sequence[str] = ()) -> List[Tuple[str, int,
     return items
 
 
-def ahash64(path: str) -> int:
-    im = Image.open(path).convert("L").resize((8, 8))
+def ahash256(path: str) -> np.ndarray:
+    """16x16 average hash packed into 32 bytes (coarser hashes merge unrelated leaves on plain backdrops)."""
+    im = Image.open(path).convert("L").resize((16, 16))
     a = np.asarray(im, dtype=float)
-    bits = (a > a.mean()).flatten()
-    return int("".join("1" if b else "0" for b in bits), 2)
+    return np.packbits((a > a.mean()).flatten())
 
 
-def _popcount(x: np.ndarray) -> np.ndarray:
-    x = x.astype(np.uint64)
-    c = np.zeros(x.shape, dtype=np.int64)
-    for _ in range(64):
-        c += (x & np.uint64(1)).astype(np.int64)
-        x = x >> np.uint64(1)
-    return c
+_POP = np.array([bin(i).count("1") for i in range(256)], dtype=np.int64)
 
 
-def duplicate_groups(paths: Sequence[str], max_hamming: int = 4) -> List[int]:
-    """Group ids such that near-duplicate images (same photo, resized/recompressed) share a group."""
-    hashes = np.array([ahash64(p) for p in paths], dtype=np.uint64)
+def duplicate_groups(paths: Sequence[str], max_hamming: int = 12) -> List[int]:
+    """Group ids such that near-duplicate images (same photo, resized/recompressed) share a group.
+    Threshold 12 of 256 bits matched the true duplicate pairs found when auditing the Kaggle TYLCV folder."""
+    hashes = np.stack([ahash256(p) for p in paths])
     n = len(paths)
     parent = list(range(n))
 
@@ -62,7 +57,7 @@ def duplicate_groups(paths: Sequence[str], max_hamming: int = 4) -> List[int]:
         return i
 
     for i in range(n - 1):
-        d = _popcount(hashes[i] ^ hashes[i + 1:])
+        d = _POP[hashes[i] ^ hashes[i + 1:]].sum(axis=1)
         for j in np.nonzero(d <= max_hamming)[0]:
             a, b = find(i), find(i + 1 + int(j))
             if a != b:
@@ -71,7 +66,7 @@ def duplicate_groups(paths: Sequence[str], max_hamming: int = 4) -> List[int]:
 
 
 def group_split(items: List[Tuple[str, int, str]], fractions=(0.7, 0.15, 0.15), seed: int = 0,
-                max_hamming: int = 4) -> Dict[str, List[Tuple[str, int, str]]]:
+                max_hamming: int = 12) -> Dict[str, List[Tuple[str, int, str]]]:
     """Stratified split by duplicate group, so no near-duplicate crosses train/val/test."""
     groups = duplicate_groups([p for p, _l, _c in items], max_hamming)
     by_group: Dict[int, List[int]] = {}

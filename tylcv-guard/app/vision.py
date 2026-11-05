@@ -38,8 +38,15 @@ def config() -> Dict[str, Optional[str]]:
             "classes": os.environ.get("ROBOFLOW_CLASSES", "Tomato - Yellow Leaf Curl Virus")}
 
 
+def local_model_path() -> Optional[str]:
+    p = os.environ.get("TYLCV_LOCAL_MODEL")
+    return p if p and os.path.exists(p) else None
+
+
 def status() -> Dict[str, Any]:
     c = config()
+    if local_model_path():
+        return {"configured": True, "backend": "local", "missing": [], "dataset": DATASET_CITATION}
     missing = [k for k in ("api_key", "workspace", "workflow_id") if not c[k]]
     return {"configured": not missing, "missing": [m.upper() for m in missing],
             "dataset": DATASET_CITATION}
@@ -117,7 +124,30 @@ def make_client():
         InferenceConfiguration(api_key_transport="header"))
 
 
+def diagnose_local(image_b64: str, threshold: Optional[float] = None) -> Dict[str, Any]:
+    """Classify with a locally trained checkpoint from dl/train.py (needs torch)."""
+    raw, ext = decode_image(image_b64)
+    try:
+        from dl import infer
+    except ImportError:
+        raise VisionError("torch/torchvision are not installed: pip install torch torchvision")
+    import io
+    from PIL import Image
+    try:
+        out = infer.predict(Image.open(io.BytesIO(raw)), local_model_path())
+    except Exception as e:  # noqa: BLE001
+        raise VisionError(f"local inference failed: {type(e).__name__}")
+    thr = out["threshold"] if threshold is None else threshold
+    p = out["probability_tylcv"]
+    verdict = ("symptoms consistent with TYLCV" if p >= thr else "no TYLCV-like symptoms detected above threshold")
+    return {"verdict": verdict, "tylcv_confidence": p, "n_detections": 1, "threshold": thr,
+            "detections": [{"class": "tylcv", "confidence": p}, {"class": "not_tylcv", "confidence": round(1 - p, 4)}],
+            "advice": ["Screening aid only: confirm suspected TYLCV by PCR/qPCR before taking action."]}
+
+
 def diagnose(image_b64: str, threshold: float = 0.5, client: Any = None) -> Dict[str, Any]:
+    if client is None and local_model_path():
+        return diagnose_local(image_b64, None if threshold == 0.5 else threshold)
     st = status()
     if not st["configured"]:
         raise VisionError("vision not configured; set " + ", ".join(st["missing"]))

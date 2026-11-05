@@ -16,14 +16,19 @@ except ImportError:  # optional dependency
 
 
 def make_leaf(path, yellow, seed, size=96):
+    """Synthetic 'leaf' with random shape, position, background and veins (varied enough that the
+    duplicate hash does not merge unrelated images)."""
     r = random.Random(seed)
     base = (r.randint(150, 200), r.randint(200, 235), r.randint(40, 90)) if yellow else (r.randint(20, 60), r.randint(110, 160), r.randint(20, 60))
-    im = Image.new("RGB", (size, size), (120, 110, 100))
+    bg = tuple(r.randint(60, 200) for _ in range(3))
+    im = Image.new("RGB", (size, size), bg)
     d = ImageDraw.Draw(im)
-    d.ellipse((10, 10, size - 10, size - 10), fill=base)
-    for _ in range(6):  # veins / texture
-        x = r.randint(20, size - 20)
-        d.line((x, 12, x + r.randint(-10, 10), size - 12), fill=(base[0] - 20, base[1] - 30, base[2]), width=2)
+    x0, y0 = r.randint(0, 25), r.randint(0, 25)
+    x1, y1 = size - r.randint(0, 25), size - r.randint(0, 25)
+    d.ellipse((x0, y0, x1, y1), fill=base)
+    for _ in range(r.randint(3, 9)):
+        xa, ya = r.randint(x0, x1), r.randint(y0, y1)
+        d.line((xa, ya, r.randint(x0, x1), r.randint(y0, y1)), fill=(max(0, base[0] - 40), max(0, base[1] - 50), base[2]), width=r.randint(1, 3))
     im.save(path, quality=92)
 
 
@@ -45,8 +50,9 @@ class DL(unittest.TestCase):
         items = D.scan_folder(self.root)
         self.assertEqual(sum(l for _p, l, _c in items), 30)
         split = D.group_split(items, seed=1)
-        where = {os.path.basename(p): k for k, v in split.items() for p, _l, _c in v}
-        self.assertEqual(where["0.jpg"], where["0_small.jpg"])
+        where = {p: k for k, v in split.items() for p, _l, _c in v}
+        h = os.path.join(self.root, "Tomato___healthy")
+        self.assertEqual(where[os.path.join(h, "0.jpg")], where[os.path.join(h, "0_small.jpg")])
         self.assertEqual(sum(len(v) for v in split.values()), 61)
         for k, v in split.items():
             self.assertTrue({l for _p, l, _c in v} == {0, 1}, k)
@@ -66,6 +72,17 @@ class DL(unittest.TestCase):
         self.assertTrue(0.0 <= pred["probability_tylcv"] <= 1.0)
         self.assertIn(pred["label"], ("tylcv", "not_tylcv"))
         self.assertTrue(os.path.exists(cam))
+        # app integration: local backend through vision.diagnose
+        import base64
+        from app import vision
+        os.environ["TYLCV_LOCAL_MODEL"] = os.path.join(out, "model.pt")
+        try:
+            raw = open(os.path.join(self.root, "Tomato___healthy", "1.jpg"), "rb").read()
+            r = vision.diagnose(base64.b64encode(raw).decode())
+            self.assertIn("verdict", r)
+            self.assertEqual(vision.status()["backend"], "local")
+        finally:
+            del os.environ["TYLCV_LOCAL_MODEL"]
 
     def test_refuses_single_class(self):
         from dl import train
