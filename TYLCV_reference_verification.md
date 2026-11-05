@@ -66,3 +66,12 @@ Dhaka 2021; Atila 2021; Ngugi 2021; Zhang 2019 (remote sensing review); Geethara
 Howard 2017 (MobileNets); Durmuş 2017; Thakur 2022; and from the earlier TYLCV review: Czosnek 2017, Kil 2016, Rojas 2018,
 Fiallo-Olivé & Navas-Castillo 2023, Mabvakure 2016, Horowitz 2020, Skendžić 2021.
 Least certain of these (check first): Thakur 2022, Durmuş 2017, Atila 2021, Rahman 2020 and the exact page ranges generally.
+
+---
+
+# TYLCV_DL_Review_Manuscript (90 references)
+
+The 86 references of the journal-style review plus Fiallo-Olivé 2020 (Phytopathology), Moriones 2017 (Viruses), Zerbini 2017
+(J. Gen. Virol.) and Roumagnac 2022 (Arch. Virol.). **All recalled from memory; none checked against a bibliographic database.**
+Verify authors, volume, pages and DOI before submission. The two dataset entries come from the URLs you supplied.
+The worked PPV example in Section 11.3 uses hypothetical numbers and is labelled as such.
