@@ -1,0 +1,7 @@
+# Only for the optional Leaf Scan feature (app/vision.py)
+inference-sdk
+# Only for benchmark/run.py
+numpy
+matplotlib
+scikit-learn
+scipy

@@ -88,6 +88,11 @@ table{border-collapse:collapse;width:100%;font-size:13px;display:block;overflow-
 <div><label>Positive samples</label><input id="l_po" type="number" value="0"></div><div><label>Sample size</label><input id="l_sz" type="number"></div></div>
 <button class="go" onclick="addSeed()">Save lot</button><span id="l_msg"></span><div id="l_list"></div></div></section>
 
+<section id="scan"><div class="card"><h3>Leaf scan (image screening)</h3>
+<p class="note">Sends the photo to a Roboflow workflow trained on a public TYLCV leaf dataset. It recognises <b>symptoms</b>, not the virus: confirm suspected cases by PCR. Needs server-side credentials (see README).</p>
+<div id="v_status"></div><label>Leaf photo (JPEG/PNG, max 5 MB)</label><input id="v_file" type="file" accept="image/jpeg,image/png">
+<label>Confidence threshold</label><input id="v_th" type="number" min="0" max="1" step="0.05" value="0.5">
+<button class="go" onclick="doScan()">Analyse</button><div id="v_out"></div></div></section>
 <section id="evid"><div class="card"><h3>Evidence library</h3>
 <label>Filter by gap</label><select id="e_f" onchange="showEvid()"></select><div id="e_list"></div>
 <p class="note">Entries come from the review paper. Verify each citation against the publisher record before relying on it.</p></div></section>
@@ -98,11 +103,11 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 async function api(p,body){const o=body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{};
  const r=await fetch(p,o);const j=await r.json();if(!r.ok)throw new Error(j.error||r.statusText);return j}
 const err=(el,e)=>$(el).innerHTML=`<p class="err">${esc(e.message)}</p>`;
-const tabs=[['overview','Gaps'],['risk','Risk'],['stack','Stacking'],['ipm','IPM'],['seq','Surveillance'],['trial','Field trials'],['seed','Seed lots'],['evid','Evidence']];
+const tabs=[['overview','Gaps'],['risk','Risk'],['stack','Stacking'],['ipm','IPM'],['seq','Surveillance'],['trial','Field trials'],['seed','Seed lots'],['scan','Leaf scan'],['evid','Evidence']];
 $('nav').innerHTML=tabs.map(([i,l])=>`<button data-t="${i}">${l}</button>`).join('');
 $('nav').onclick=e=>{const t=e.target.dataset.t;if(!t)return;document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===t));
  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
- if(t==='trial')loadTrials();if(t==='seed')loadSeeds();if(t==='seq')loadSv();if(t==='evid')loadEvid();};
+ if(t==='trial')loadTrials();if(t==='seed')loadSeeds();if(t==='seq')loadSv();if(t==='evid')loadEvid();if(t==='scan')loadVision();};
 const pill=c=>`<span class="pill ${c.split(' ')[0]}">${esc(c)}</span>`;
 async function doRisk(){try{const j=await api('/api/risk',{temp_c:+$('r_t').value,whitefly_per_leaf:+$('r_w').value,stage:$('r_s').value,protection:+$('r_p').value,exclusion:$('r_e').value==='1'});
  $('r_out').innerHTML=`<p>Index <b>${j.index}</b> ${pill(j.category)}</p><ul>${j.actions.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`}catch(e){err('r_out',e)}}
@@ -126,6 +131,12 @@ async function loadTrials(){try{const j=await api('/api/trials/summary');$('t_su
 async function trainModel(){try{const j=await api('/api/model/train',{});$('m_msg').textContent=` Trained on ${j.n_rows} trials.`}catch(e){$('m_msg').innerHTML=` <span class="err">${esc(e.message)}</span>`}}
 async function predictModel(){try{const j=await api('/api/model/predict',{temp_c:+$('m_t').value,whitefly_per_leaf:+$('m_w').value,stage:$('m_s').value,loci:csv($('m_l').value)});
  $('m_out').innerHTML=`<p>v2 predicted incidence <b>${(j.v2_incidence*100).toFixed(1)}%</b> · v1 index <b>${j.v1_index}</b> ${pill(j.v1_category)}</p>`}catch(e){err('m_out',e)}}
+async function loadVision(){try{const j=await api('/api/vision/status');$('v_status').innerHTML=j.configured?'<p class="note">Vision service configured.</p>':`<p class="warn">Not configured: set ${j.missing.map(esc).join(', ')} on the server.</p>`}catch(e){err('v_status',e)}}
+async function doScan(){try{const f=$('v_file').files[0];if(!f)throw new Error('choose an image first');if(f.size>5*1024*1024)throw new Error('image larger than 5 MB');
+ const data=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});
+ $('v_out').innerHTML='<p class="note">Analysing…</p>';
+ const j=await api('/api/diagnose',{image:data,threshold:+$('v_th').value});
+ $('v_out').innerHTML=`<p><b>${esc(j.verdict)}</b> · TYLCV confidence ${(j.tylcv_confidence*100).toFixed(1)}%</p><table><tr><th>Class</th><th>Confidence</th></tr>${j.detections.map(d=>`<tr><td>${esc(d.class)}</td><td>${(d.confidence*100).toFixed(1)}%</td></tr>`).join('')}</table><ul>${j.advice.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`}catch(e){err('v_out',e)}}
 async function addSeed(){try{await api('/api/seedlots',{lot:$('l_lot').value,origin:$('l_or').value,method:$('l_me').value,tested:+$('l_te').value,positive:+$('l_po').value,sample_size:$('l_sz').value});$('l_msg').textContent=' Saved.';loadSeeds()}catch(e){$('l_msg').innerHTML=` <span class="err">${esc(e.message)}</span>`}}
 async function loadSeeds(){try{const j=await api('/api/seedlots');$('l_list').innerHTML=j.length?`<table><tr><th>Lot</th><th>Origin</th><th>Method</th><th>Status</th><th>Upper 95% prevalence</th></tr>${j.map(r=>`<tr><td>${esc(r.lot)}</td><td>${esc(r.origin)}</td><td>${esc(r.method)}</td><td>${esc(r.status)}</td><td>${r.prevalence_upper95??'-'}</td></tr>`).join('')}</table>`:'<p class="note">No lots yet.</p>'}catch(e){err('l_list',e)}}
 let EV=[];async function loadEvid(){if(!EV.length){EV=await api('/api/evidence');const g=[...new Set(EV.map(e=>e.gap))].sort();$('e_f').innerHTML='<option value="">All</option>'+g.map(x=>`<option>${esc(x)}</option>`).join('')}showEvid()}

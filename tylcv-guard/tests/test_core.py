@@ -172,7 +172,7 @@ class API(unittest.TestCase):
     def test_pages_and_data(self):
         self.assertEqual(self.call("/")[0], 200)
         self.assertEqual(self.call("/api/health")[0], 200)
-        self.assertEqual(len(json.loads(self.call("/api/evidence")[1])), 40)
+        self.assertEqual(len(json.loads(self.call("/api/evidence")[1])), 41)
         self.assertEqual(len(json.loads(self.call("/api/gaps")[1])), 7)
         self.assertEqual(self.call("/nope")[0], 404)
 
@@ -281,6 +281,61 @@ class ModelAPI(unittest.TestCase):
         self.assertEqual(s, 200, b)
         s, b = self.call("/api/model/predict", {"temp_c": 28, "whitefly_per_leaf": 2, "loci": ["Ty-2"]})
         self.assertEqual(s, 200); self.assertIn("v2_incidence", json.loads(b))
+
+
+class Vision(unittest.TestCase):
+    JPG = "data:image/jpeg;base64," + __import__("base64").b64encode(b"\xff\xd8\xff\xe0" + b"0" * 64).decode()
+
+    class FakeClient:
+        def __init__(self, result): self.result, self.calls = result, []
+        def run_workflow(self, **kw):
+            import os as _os
+            assert _os.path.exists(kw["images"]["image"])  # temp file exists during the call
+            self.calls.append(kw); return self.result
+
+    def setUp(self):
+        from app import vision
+        self.v = vision
+        self._env = dict(os.environ)
+        os.environ.update({"ROBOFLOW_API_KEY": "k", "ROBOFLOW_WORKSPACE": "w", "ROBOFLOW_WORKFLOW_ID": "f"})
+
+    def tearDown(self):
+        os.environ.clear(); os.environ.update(self._env)
+
+    def test_extract_and_summarize(self):
+        res = [{"outputs": {"predictions": {"predictions": [
+            {"class": "Tomato - Yellow Leaf Curl Virus", "confidence": 0.91}, {"class": "healthy", "confidence": 0.3}]}}}]
+        out = self.v.diagnose(self.JPG, 0.5, client=self.FakeClient(res))
+        self.assertIn("consistent with TYLCV", out["verdict"])
+        self.assertAlmostEqual(out["tylcv_confidence"], 0.91)
+        low = self.v.diagnose(self.JPG, 0.95, client=self.FakeClient(res))
+        self.assertIn("no TYLCV-like", low["verdict"])
+        self.assertIn("no detections", self.v.diagnose(self.JPG, 0.5, client=self.FakeClient([]))["verdict"])
+
+    def test_workflow_called_with_config_and_cleanup(self):
+        c = self.FakeClient([])
+        self.v.diagnose(self.JPG, 0.5, client=c)
+        kw = c.calls[0]
+        self.assertEqual((kw["workspace_name"], kw["workflow_id"]), ("w", "f"))
+        self.assertFalse(os.path.exists(kw["images"]["image"]))  # temp file removed
+
+    def test_validation(self):
+        with self.assertRaises(self.v.VisionError):
+            self.v.decode_image("")
+        with self.assertRaises(self.v.VisionError):
+            self.v.decode_image(__import__("base64").b64encode(b"GIF89a....").decode())
+        with self.assertRaises(self.v.VisionError):
+            self.v.decode_image(__import__("base64").b64encode(b"\xff\xd8\xff" + b"0" * (6 * 1024 * 1024)).decode())
+        os.environ.pop("ROBOFLOW_API_KEY")
+        with self.assertRaises(self.v.VisionError):
+            self.v.diagnose(self.JPG, client=self.FakeClient([]))
+
+    def test_sdk_error_is_sanitised(self):
+        class Boom:
+            def run_workflow(self, **kw): raise RuntimeError("secret-key-in-message")
+        with self.assertRaises(self.v.VisionError) as cm:
+            self.v.diagnose(self.JPG, client=Boom())
+        self.assertNotIn("secret", str(cm.exception))
 
 
 if __name__ == "__main__":

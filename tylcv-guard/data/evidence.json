@@ -238,5 +238,11 @@
   "gap": "G4",
   "citation": "S. Skendžić, M. Zovko, I. P. Živković, V. Lešić, and D. Lemić, “The impact of climate change on agricultural insect pests,” Insects, vol. 12, no. 5, p. 440, 2021.",
   "verified": false
+ },
+ {
+  "id": "roboflow_dataset",
+  "gap": "G5",
+  "citation": "Thesis, “Tomato - Yellow Leaf Curl Virus Dataset,” Roboflow Universe, Roboflow, Dec. 2022. [Online]. Available: https://universe.roboflow.com/thesis-okplj/tomato-yellow-leaf-curl-virus",
+  "verified": true
  }
 ]

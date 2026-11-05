@@ -10,13 +10,13 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-from . import calibrate, db, risk, rotation, seqtools, stacking
+from . import calibrate, db, risk, rotation, seqtools, stacking, vision
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 STATIC = os.path.join(ROOT, "static")
 EVIDENCE = os.path.join(ROOT, "data", "evidence.json")
 MODEL_PATH = os.environ.get("TYLCV_MODEL", os.path.join(ROOT, "data", "model_v2.json"))
-MAX_BODY = 5 * 1024 * 1024
+MAX_BODY = 8 * 1024 * 1024  # a 5 MB image is ~6.7 MB as base64
 
 GAPS = [
     {"id": "G1", "gap": "Durability of resistance (stacked Ty loci, temperature, recombinants)",
@@ -77,6 +77,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"status": "ok"})
             if path == "/api/gaps":
                 return self._send(200, GAPS)
+            if path == "/api/vision/status":
+                return self._send(200, vision.status())
             if path == "/api/model":
                 if not os.path.exists(MODEL_PATH):
                     return self._send(200, {"trained": False})
@@ -129,6 +131,8 @@ class Handler(BaseHTTPRequestHandler):
                     list(body.get("available_groups", [])), list(body.get("history", [])),
                     int(body.get("sprays", 6)), list(body.get("failed_groups", [])),
                     dict(body.get("efficacy", {}))))
+            if path == "/api/diagnose":
+                return self._send(200, vision.diagnose(body.get("image", ""), float(body.get("threshold", 0.5))))
             if path == "/api/model/predict":
                 if not os.path.exists(MODEL_PATH):
                     raise ValueError("model not trained yet: POST /api/model/train after logging 30+ trials")

@@ -10,7 +10,7 @@ are not validated against field data and it is not a substitute for expert or lo
 ```bash
 cd tylcv-guard
 python -m app.server --port 8080      # open http://127.0.0.1:8080
-python -m unittest discover -s tests -t .   # 27 tests
+python -m unittest discover -s tests -t .   # 31 tests
 ```
 
 Docker: `docker build -t tylcv-guard . && docker run -p 8080:8080 tylcv-guard`
@@ -34,9 +34,30 @@ reliability diagrams, heatmaps, box plots, learning curve, radar, ...). See `ben
 v2 additions: `app/calibrate.py` (model learned from logged trials; endpoints `/api/model`, `/api/model/train`,
 `/api/model/predict`), `recombination_screen_v2`, and an efficacy-adaptive `rotation.plan(..., efficacy={...})`.
 
+## Leaf scan (optional Roboflow integration)
+
+Photo screening through a Roboflow workflow built on the public dataset
+*Tomato - Yellow Leaf Curl Virus* (Thesis, Roboflow Universe, 2022):
+<https://universe.roboflow.com/thesis-okplj/tomato-yellow-leaf-curl-virus>. Check the dataset's licence on that page before
+any redistribution or commercial use.
+
+```bash
+pip install inference-sdk
+export ROBOFLOW_API_KEY=...            # never commit this; it is read only from the environment
+export ROBOFLOW_WORKSPACE=<your-workspace>
+export ROBOFLOW_WORKFLOW_ID=<your-workflow-id>
+python -m app.server
+```
+
+`POST /api/diagnose {image: <base64 or data-URL>, threshold: 0.5}` → verdict, TYLCV confidence, detections. Images are
+validated (JPEG/PNG, ≤5 MB), written to a temp file for the SDK call, then deleted; SDK errors are sanitised so keys never
+leak. **Caveats:** it recognises symptoms, not the virus (confirm by PCR); the model's accuracy has not been evaluated here;
+the integration was tested only against a mocked client because the build environment could not reach Roboflow, so run one
+real image through it before relying on it.
+
 ## API (JSON)
 
-`GET /api/health | gaps | loci | evidence | refseqs | trials | trials/summary | trials.csv | seedlots | surveillance/summary`
+`GET /api/vision/status`  ·  `POST /api/diagnose`  ·  `GET /api/health | gaps | loci | evidence | refseqs | trials | trials/summary | trials.csv | seedlots | surveillance/summary`
 `POST /api/risk | risk/season | stacking | rotation | refseqs | classify | trials | seedlots | model/train | model/predict`  ·  `GET /api/model`
 
 ## Limitations (read before use)
