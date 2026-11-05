@@ -50,3 +50,19 @@ database; verify authors, volume, pages and DOI before submission.
 **Revision (49 references):** nine references were added to TYLCV_DL_Review_Paper_IEEE, all recalled from memory and unchecked:
 Chen 2020 (SimCLR); He 2020 (MoCo); Shorten & Khoshgoftaar 2019; Zhuang 2021; Ovadia 2019; Koh 2021 (WILDS); Adebayo 2018;
 Sandler 2018 (MobileNetV2); Ghosal 2018. Verify authors, volume, pages and DOI before submission.
+
+---
+
+# TYLCV_DL_Journal_Review_IEEE (86 references)
+
+Superset of the 49-reference review paper plus 37 further references. **None was checked against a bibliographic database**; all
+were written from memory and must be verified (authors, volume, pages, DOI) before submission.
+
+Added in the journal version (recalled): Loshchilov & Hutter 2019 (AdamW); Szegedy 2016 (Inception); Huang 2017 (DenseNet);
+Lin 2017 (focal loss); Cui 2019 (class-balanced loss); Kornblith 2019; Liu 2016 (SSD); Carion 2020 (DETR); Chen 2018 (DeepLab);
+Kirillov 2023 (SAM); Radford 2021 (CLIP); Caron 2021 (DINO); Lundberg & Lee 2017 (SHAP); Ribeiro 2016 (LIME); Lakshminarayanan
+2017 (ensembles); Gal & Ghahramani 2016 (MC dropout); Zhang 2018 (mixup); Cubuk 2019 (AutoAugment); Boulent 2019; Hasan 2020;
+Dhaka 2021; Atila 2021; Ngugi 2021; Zhang 2019 (remote sensing review); Geetharamani & Pandian 2019; Arsenovic 2019; Rahman 2020;
+Howard 2017 (MobileNets); Durmuş 2017; Thakur 2022; and from the earlier TYLCV review: Czosnek 2017, Kil 2016, Rojas 2018,
+Fiallo-Olivé & Navas-Castillo 2023, Mabvakure 2016, Horowitz 2020, Skendžić 2021.
+Least certain of these (check first): Thakur 2022, Durmuş 2017, Atila 2021, Rahman 2020 and the exact page ranges generally.
