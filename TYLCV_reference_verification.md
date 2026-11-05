@@ -12,3 +12,20 @@ Prasad 2020; Zerbini 2017; Roumagnac 2022; Fiallo-Olivé & Navas-Castillo 2023; 
 Rojas 2018 (full author list TBC); Ali 2016; Mahas & Mahfouz 2018; Xie 2017; Kanakala & Ghanim 2019; Kanakala & Ghanim 2016; Pan 2018; Dângelo 2018; Sani 2020; Fiallo-Olivé 2021 (author list TBC).
 
 Entries still showing "[Authors TBC]" / "[Title TBC]" in the paper must be completed.
+
+---
+
+# Verification status: TYLCV_DL_review_IEEE (40 references)
+
+No bibliographic database was reachable, so **none of these was checked against a database**. All entries were written from memory
+(I believe they are real, but volume/page/author details may contain errors) except the two dataset entries, which come from the
+URLs you supplied (Roboflow Universe, Kaggle; Kaggle author/year not shown on the pasted snippet).
+
+Recalled, verify DOI/pages before submission: Mohanty 2016; Ferentinos 2018; Too 2019; Brahimi 2017; Fuentes 2017; Kamilaris 2018;
+Barbedo 2018 and 2019; Liu & Wang 2021; Saleem 2019; Selvaraju 2017 (Grad-CAM); Howard 2019 (MobileNetV3); He 2016 (ResNet);
+Tan & Le 2019; Dosovitskiy 2021; Liu 2021 (Swin); Redmon 2016; Ren 2017; Guo 2017; Geirhos 2020; Ahmad 2023; Singh 2020 (PlantDoc);
+Ramcharan 2017; Picon 2019; Sladojevic 2016; Karthik 2020; Agarwal 2020 (ToLeD); Zhao 2021; Ouhami 2021; Abade 2021;
+Wspanialy 2020; Zhang 2018; Mahlein 2016; Lee 2020; Noyan 2022 (arXiv); Shoaib 2023; Prasad 2020; Yan 2018.
+
+Statements most worth re-checking against the sources: Mohanty's ~31% off-distribution accuracy; Noyan's background-only finding;
+the attributions of attention modules to Karthik 2020 and Zhao 2021; and the characterisation of Lee 2020.
