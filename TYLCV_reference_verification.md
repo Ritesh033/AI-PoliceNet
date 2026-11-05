@@ -46,3 +46,7 @@ co-supervisor names/IDs, UID, examiner, viva date, and the plagiarism report (An
 
 Same 40 references as TYLCV_DL_review_IEEE (see that section above): written from memory, none checked against a bibliographic
 database; verify authors, volume, pages and DOI before submission.
+
+**Revision (49 references):** nine references were added to TYLCV_DL_Review_Paper_IEEE, all recalled from memory and unchecked:
+Chen 2020 (SimCLR); He 2020 (MoCo); Shorten & Khoshgoftaar 2019; Zhuang 2021; Ovadia 2019; Koh 2021 (WILDS); Adebayo 2018;
+Sandler 2018 (MobileNetV2); Ghosal 2018. Verify authors, volume, pages and DOI before submission.
