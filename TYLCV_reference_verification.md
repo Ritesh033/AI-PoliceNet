@@ -29,3 +29,13 @@ Wspanialy 2020; Zhang 2018; Mahlein 2016; Lee 2020; Noyan 2022 (arXiv); Shoaib 2
 
 Statements most worth re-checking against the sources: Mohanty's ~31% off-distribution accuracy; Noyan's background-only finding;
 the attributions of attention modules to Karthik 2020 and Zhao 2021; and the characterisation of Lee 2020.
+
+---
+
+# Verification status: TYLCV_Synopsis_Report (51 references)
+
+The reference list is the union of the two earlier reference sets (TYLCV review and deep-learning review), restricted to the entries
+cited in the report. As before, **none was checked against a bibliographic database** (none was reachable); all were written from
+memory except the two dataset entries taken from the URLs you supplied. Verify every entry (authors, volume, pages, DOI) before
+submission. Placeholders in the report that you must fill: degree/programme, branch, institution and logo, supervisor and
+co-supervisor names/IDs, UID, examiner, viva date, and the plagiarism report (Annexure I).
