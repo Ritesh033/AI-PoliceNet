@@ -75,3 +75,12 @@ The 86 references of the journal-style review plus Fiallo-Olivé 2020 (Phytopath
 (J. Gen. Virol.) and Roumagnac 2022 (Arch. Virol.). **All recalled from memory; none checked against a bibliographic database.**
 Verify authors, volume, pages and DOI before submission. The two dataset entries come from the URLs you supplied.
 The worked PPV example in Section 11.3 uses hypothetical numbers and is labelled as such.
+
+---
+
+# TYLCV_DL_Review_Journal_Paper (90 references)
+
+Same 90 references as TYLCV_DL_Review_Manuscript, reformatted from IEEE style to a plain journal style
+(Authors, Title, Journal volume(issue) (year) pages). The reformatting was automatic: 53 journal and 33 conference entries were
+converted, 4 (datasets/arXiv) kept as written. **All entries were recalled from memory and none was checked against a
+bibliographic database**; verify authors, volume, pages and DOI before submission, and check the automatic reformatting.
