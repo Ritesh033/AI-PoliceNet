@@ -31,6 +31,22 @@
    "leak_random": 0.9642857142857143,
    "leak_group": 0.2857142857142857,
    "n_images": 560
+  },
+  {
+   "seed": 2,
+   "random": {
+    "acc": 0.8452380952380952,
+    "auc": 0.9659160073037127,
+    "n_test": 84
+   },
+   "group": {
+    "acc": 0.7160493827160493,
+    "auc": 0.7995283018867925,
+    "n_test": 81
+   },
+   "leak_random": 0.9166666666666666,
+   "leak_group": 0.2716049382716049,
+   "n_images": 560
   }
  ],
  "classic": [
@@ -78,6 +94,261 @@
    },
    "leak_random": 0.9166666666666666,
    "leak_group": 0.2716049382716049
+  },
+  {
+   "seed": 3,
+   "random": {
+    "1-NN (pixels)": 0.9642857142857143,
+    "5-NN (pixels)": 0.8333333333333334,
+    "Logistic (pixels)": 0.9285714285714286
+   },
+   "group": {
+    "1-NN (pixels)": 0.9722222222222222,
+    "5-NN (pixels)": 0.8055555555555556,
+    "Logistic (pixels)": 0.7222222222222222
+   },
+   "leak_random": 0.9642857142857143,
+   "leak_group": 0.3888888888888889
+  },
+  {
+   "seed": 4,
+   "random": {
+    "1-NN (pixels)": 1.0,
+    "5-NN (pixels)": 0.8571428571428571,
+    "Logistic (pixels)": 0.9404761904761905
+   },
+   "group": {
+    "1-NN (pixels)": 0.4868421052631579,
+    "5-NN (pixels)": 0.40789473684210525,
+    "Logistic (pixels)": 0.5
+   },
+   "leak_random": 0.9642857142857143,
+   "leak_group": 0.13157894736842105
+  },
+  {
+   "seed": 5,
+   "random": {
+    "1-NN (pixels)": 1.0,
+    "5-NN (pixels)": 0.8690476190476191,
+    "Logistic (pixels)": 0.9285714285714286
+   },
+   "group": {
+    "1-NN (pixels)": 0.6125,
+    "5-NN (pixels)": 0.625,
+    "Logistic (pixels)": 0.5125
+   },
+   "leak_random": 0.9523809523809523,
+   "leak_group": 0.075
+  },
+  {
+   "seed": 6,
+   "random": {
+    "1-NN (pixels)": 0.9761904761904762,
+    "5-NN (pixels)": 0.8214285714285714,
+    "Logistic (pixels)": 0.9761904761904762
+   },
+   "group": {
+    "1-NN (pixels)": 0.5733333333333334,
+    "5-NN (pixels)": 0.5733333333333334,
+    "Logistic (pixels)": 0.5733333333333334
+   },
+   "leak_random": 0.9166666666666666,
+   "leak_group": 0.2
+  },
+  {
+   "seed": 7,
+   "random": {
+    "1-NN (pixels)": 1.0,
+    "5-NN (pixels)": 0.7857142857142857,
+    "Logistic (pixels)": 0.9880952380952381
+   },
+   "group": {
+    "1-NN (pixels)": 0.6341463414634146,
+    "5-NN (pixels)": 0.6585365853658537,
+    "Logistic (pixels)": 0.5121951219512195
+   },
+   "leak_random": 1.0,
+   "leak_group": 0.14634146341463414
+  },
+  {
+   "seed": 8,
+   "random": {
+    "1-NN (pixels)": 1.0,
+    "5-NN (pixels)": 0.7142857142857143,
+    "Logistic (pixels)": 0.9642857142857143
+   },
+   "group": {
+    "1-NN (pixels)": 0.6349206349206349,
+    "5-NN (pixels)": 0.4603174603174603,
+    "Logistic (pixels)": 0.6984126984126984
+   },
+   "leak_random": 1.0,
+   "leak_group": 0.23809523809523808
+  },
+  {
+   "seed": 9,
+   "random": {
+    "1-NN (pixels)": 1.0,
+    "5-NN (pixels)": 0.75,
+    "Logistic (pixels)": 0.9404761904761905
+   },
+   "group": {
+    "1-NN (pixels)": 0.4791666666666667,
+    "5-NN (pixels)": 0.3958333333333333,
+    "Logistic (pixels)": 0.4583333333333333
+   },
+   "leak_random": 1.0,
+   "leak_group": 0.08333333333333333
+  },
+  {
+   "seed": 10,
+   "random": {
+    "1-NN (pixels)": 1.0,
+    "5-NN (pixels)": 0.6785714285714286,
+    "Logistic (pixels)": 0.9404761904761905
+   },
+   "group": {
+    "1-NN (pixels)": 0.5423728813559322,
+    "5-NN (pixels)": 0.4406779661016949,
+    "Logistic (pixels)": 0.6779661016949152
+   },
+   "leak_random": 1.0,
+   "leak_group": 0.0847457627118644
+  },
+  {
+   "seed": 11,
+   "random": {
+    "1-NN (pixels)": 0.9761904761904762,
+    "5-NN (pixels)": 0.8214285714285714,
+    "Logistic (pixels)": 0.9404761904761905
+   },
+   "group": {
+    "1-NN (pixels)": 0.5441176470588235,
+    "5-NN (pixels)": 0.4852941176470588,
+    "Logistic (pixels)": 0.6323529411764706
+   },
+   "leak_random": 0.9761904761904762,
+   "leak_group": 0.17647058823529413
+  },
+  {
+   "seed": 12,
+   "random": {
+    "1-NN (pixels)": 0.9880952380952381,
+    "5-NN (pixels)": 0.8214285714285714,
+    "Logistic (pixels)": 0.9285714285714286
+   },
+   "group": {
+    "1-NN (pixels)": 0.475,
+    "5-NN (pixels)": 0.35,
+    "Logistic (pixels)": 0.825
+   },
+   "leak_random": 0.9880952380952381,
+   "leak_group": 0.3
+  },
+  {
+   "seed": 13,
+   "random": {
+    "1-NN (pixels)": 0.9642857142857143,
+    "5-NN (pixels)": 0.7738095238095238,
+    "Logistic (pixels)": 0.9285714285714286
+   },
+   "group": {
+    "1-NN (pixels)": 0.6346153846153846,
+    "5-NN (pixels)": 0.6153846153846154,
+    "Logistic (pixels)": 0.7115384615384616
+   },
+   "leak_random": 0.9523809523809523,
+   "leak_group": 0.19230769230769232
+  },
+  {
+   "seed": 14,
+   "random": {
+    "1-NN (pixels)": 1.0,
+    "5-NN (pixels)": 0.7738095238095238,
+    "Logistic (pixels)": 0.9404761904761905
+   },
+   "group": {
+    "1-NN (pixels)": 0.7283950617283951,
+    "5-NN (pixels)": 0.7037037037037037,
+    "Logistic (pixels)": 0.6419753086419753
+   },
+   "leak_random": 1.0,
+   "leak_group": 0.18518518518518517
+  },
+  {
+   "seed": 15,
+   "random": {
+    "1-NN (pixels)": 0.9761904761904762,
+    "5-NN (pixels)": 0.7261904761904762,
+    "Logistic (pixels)": 0.9166666666666666
+   },
+   "group": {
+    "1-NN (pixels)": 0.5172413793103449,
+    "5-NN (pixels)": 0.5172413793103449,
+    "Logistic (pixels)": 0.6551724137931034
+   },
+   "leak_random": 0.9761904761904762,
+   "leak_group": 0.13793103448275862
+  },
+  {
+   "seed": 16,
+   "random": {
+    "1-NN (pixels)": 1.0,
+    "5-NN (pixels)": 0.7619047619047619,
+    "Logistic (pixels)": 0.9523809523809523
+   },
+   "group": {
+    "1-NN (pixels)": 0.7272727272727273,
+    "5-NN (pixels)": 0.6363636363636364,
+    "Logistic (pixels)": 0.6818181818181818
+   },
+   "leak_random": 0.9642857142857143,
+   "leak_group": 0.29545454545454547
+  },
+  {
+   "seed": 17,
+   "random": {
+    "1-NN (pixels)": 0.9880952380952381,
+    "5-NN (pixels)": 0.7261904761904762,
+    "Logistic (pixels)": 0.9523809523809523
+   },
+   "group": {
+    "1-NN (pixels)": 0.4625,
+    "5-NN (pixels)": 0.475,
+    "Logistic (pixels)": 0.6
+   },
+   "leak_random": 0.9404761904761905,
+   "leak_group": 0.1125
+  },
+  {
+   "seed": 18,
+   "random": {
+    "1-NN (pixels)": 0.9880952380952381,
+    "5-NN (pixels)": 0.8095238095238095,
+    "Logistic (pixels)": 0.9404761904761905
+   },
+   "group": {
+    "1-NN (pixels)": 0.5733333333333334,
+    "5-NN (pixels)": 0.6133333333333333,
+    "Logistic (pixels)": 0.4266666666666667
+   },
+   "leak_random": 0.9523809523809523,
+   "leak_group": 0.16
+  },
+  {
+   "seed": 19,
+   "random": {
+    "1-NN (pixels)": 0.9642857142857143,
+    "5-NN (pixels)": 0.75,
+    "Logistic (pixels)": 0.9880952380952381
+   },
+   "group": {
+    "1-NN (pixels)": 0.620253164556962,
+    "5-NN (pixels)": 0.4430379746835443,
+    "Logistic (pixels)": 0.7721518987341772
+   },
+   "leak_random": 0.9523809523809523,
+   "leak_group": 0.24050632911392406
   }
  ]
 }

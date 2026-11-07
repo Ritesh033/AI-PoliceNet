@@ -84,3 +84,20 @@ Same 90 references as TYLCV_DL_Review_Manuscript, reformatted from IEEE style to
 (Authors, Title, Journal volume(issue) (year) pages). The reformatting was automatic: 53 journal and 33 conference entries were
 converted, 4 (datasets/arXiv) kept as written. **All entries were recalled from memory and none was checked against a
 bibliographic database**; verify authors, volume, pages and DOI before submission, and check the automatic reformatting.
+
+---
+
+# TYLCV_Research_Paper (50 references)
+
+Exactly 50 references, a subset of the earlier 90 (reformatted to plain journal style by script). **All recalled from memory; none
+checked against a bibliographic database** - verify authors, volume, pages and DOI before submission. The two dataset entries
+come from the URLs you supplied.
+
+Evidence in the paper (what is real, synthetic or simulated):
+- REAL: audit and statistics of the 100 photographs in the Kaggle folder you uploaded (photographs shown for illustration; the
+  dataset licence was NOT verified - check it before publishing the images).
+- SYNTHETIC IMAGES + REAL TRAINING: leakage experiment (experiments/leakage_demo.py; 20 seeds classical, 3 seeds CNN).
+- SIMULATED: decision-support benchmark and sensitivity analyses (benchmark/, experiments/sensitivity.py).
+- NOT DONE: no image classifier was trained or evaluated on real labelled leaf photographs (no negatives, no pretrained weights);
+  the paper says so and makes no field-accuracy claim.
+- UI screenshots use synthetic demonstration data.
