@@ -101,3 +101,12 @@ Evidence in the paper (what is real, synthetic or simulated):
 - NOT DONE: no image classifier was trained or evaluated on real labelled leaf photographs (no negatives, no pretrained weights);
   the paper says so and makes no field-accuracy claim.
 - UI screenshots use synthetic demonstration data.
+
+---
+
+# TYLCV_Research_Paper_IEEE (30 references, 6 pages)
+
+A 30-reference subset of the 50 in TYLCV_Research_Paper, in IEEE style. All recalled from memory; none checked against a
+bibliographic database - verify authors, volume, pages and DOI before submission. The evidence caveats listed for
+TYLCV_Research_Paper apply unchanged (no image classifier trained on real labelled photos; audit is real, leakage experiment is
+synthetic, benchmark is simulated; Kaggle photo licence not verified).
